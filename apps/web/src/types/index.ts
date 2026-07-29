@@ -1,0 +1,137 @@
+export type TabType = 'dashboard' | 'assets' | 'visits' | 'issues';
+
+export interface HealthStatus {
+  status: string;
+  service: string;
+  version: string;
+  timestamp: string;
+  uptime: number;
+  environment: string;
+}
+
+export interface Location {
+  id: string;
+  name: string;
+  building?: string;
+  floor?: string;
+  room?: string;
+}
+
+export interface Asset {
+  id: string;
+  code: string;
+  name: string;
+  assetTag?: string;
+  serialNumber?: string;
+  hostname?: string;
+  ipAddress?: string;
+  category: string;
+  locationId?: string;
+  locationName?: string;
+  status: 'OPERATIONAL' | 'MAINTENANCE' | 'CRITICAL' | 'INACTIVE';
+  imageUrl?: string;
+  lastInspection?: string;
+  assignedTo?: string;
+}
+
+export type VisitAssetStatus = 'ESPERADO' | 'ENCONTRADO' | 'AUSENTE' | 'NOVO';
+
+export interface VisitAsset {
+  id: string;
+  visitId: string;
+  assetId?: string;
+  asset?: Asset;
+  status: VisitAssetStatus;
+  notes?: string;
+  photoUrl?: string;
+  checkedAt?: string;
+}
+
+export type VisitStatus = 'PLANEJADA' | 'EM_ANDAMENTO' | 'PAUSADA' | 'CONCLUIDA' | 'CANCELADA';
+
+export interface Visit {
+  id: string;
+  protocol: string;
+  client: string;
+  address: string;
+  locationId?: string;
+  locationName?: string;
+  technician?: string;
+  date: string;
+  time: string;
+  status: VisitStatus;
+  priority: 'BAIXA' | 'MEDIA' | 'ALTA' | 'CRITICA';
+  type: 'PREVENTIVA' | 'CORRETIVA' | 'INSTALACAO' | 'INSPECAO';
+  startedAt?: string;
+  completedAt?: string;
+  notes?: string;
+  visitAssets?: VisitAsset[];
+}
+
+export interface AuditSummary {
+  visitId: string;
+  protocol: string;
+  status: VisitStatus;
+  startedAt?: string;
+  completedAt?: string;
+  totals: {
+    totalAssets: number;
+    esperados: number;
+    encontrados: number;
+    ausentes: number;
+    novos: number;
+    conciliationRate: number;
+  };
+  visitAssets: VisitAsset[];
+}
+
+export type ChecklistFieldType = 'YES_NO' | 'TEXT' | 'NUMBER' | 'SELECT' | 'PHOTO';
+
+export interface ChecklistItem {
+  id: string;
+  templateId: string;
+  label: string;
+  fieldType: ChecklistFieldType;
+  isRequired: boolean;
+  options?: string;
+  order: number;
+}
+
+export interface ChecklistTemplate {
+  id: string;
+  name: string;
+  description?: string;
+  category: string;
+  items: ChecklistItem[];
+}
+
+export interface ChecklistResponse {
+  id: string;
+  visitId: string;
+  checklistItemId: string;
+  assetId?: string;
+  value: string;
+  notes?: string;
+}
+
+export type IssueSeverity = 'INFO' | 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+export type IssueStatus = 'OPEN' | 'IN_ANALYSIS' | 'IN_PROGRESS' | 'RESOLVED';
+
+export interface Issue {
+  id: string;
+  protocol?: string;
+  title: string;
+  description: string;
+  severity: IssueSeverity;
+  status: IssueStatus;
+  recommendation?: string;
+  companyId?: string;
+  visitId?: string;
+  visitProtocol?: string;
+  assetId?: string;
+  assetName?: string;
+  locationId?: string;
+  locationName?: string;
+  reportedBy?: string;
+  createdAt: string;
+}

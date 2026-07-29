@@ -1,0 +1,286 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  MANAGER
+  TECHNICIAN
+  VIEWER
+}
+
+enum AssetStatus {
+  OPERATIONAL
+  MAINTENANCE
+  INACTIVE
+  CRITICAL
+}
+
+enum VisitStatus {
+  PLANEJADA
+  EM_ANDAMENTO
+  PAUSADA
+  CONCLUIDA
+  CANCELADA
+}
+
+enum VisitAssetStatus {
+  ESPERADO
+  ENCONTRADO
+  AUSENTE
+  NOVO
+}
+
+enum VisitPriority {
+  BAIXA
+  MEDIA
+  ALTA
+  CRITICA
+}
+
+enum VisitType {
+  PREVENTIVA
+  CORRETIVA
+  INSTALACAO
+  INSPECAO
+}
+
+enum ChecklistFieldType {
+  YES_NO
+  TEXT
+  NUMBER
+  SELECT
+  PHOTO
+}
+
+enum IssueSeverity {
+  INFO
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum IssueStatus {
+  OPEN
+  IN_ANALYSIS
+  IN_PROGRESS
+  RESOLVED
+}
+
+model Company {
+  id        String   @id @default(uuid())
+  name      String
+  cnpj      String?  @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users     User[]
+  locations Location[]
+  assets    Asset[]
+  visits    Visit[]
+  issues    Issue[]
+
+  @@map("companies")
+}
+
+model Location {
+  id        String   @id @default(uuid())
+  name      String
+  building  String?
+  floor     String?
+  room      String?
+  companyId String
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  assets Asset[]
+  visits Visit[]
+  issues Issue[]
+
+  @@map("locations")
+}
+
+model User {
+  id        String   @id @default(uuid())
+  name      String
+  email     String   @unique
+  password  String
+  role      Role     @default(TECHNICIAN)
+  companyId String
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  assets         Asset[]
+  visits         Visit[]
+  reportedIssues Issue[]
+
+  @@map("users")
+}
+
+model Asset {
+  id           String      @id @default(uuid())
+  name         String
+  code         String      @unique
+  assetTag     String?     // Patrimônio
+  serialNumber String?
+  hostname     String?
+  ipAddress    String?
+  category     String
+  status       AssetStatus @default(OPERATIONAL)
+  imageUrl     String?
+
+  locationId String?
+  location   Location? @relation(fields: [locationId], references: [id], onDelete: SetNull)
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  assignedToId String?
+  assignedTo   User?   @relation(fields: [assignedToId], references: [id], onDelete: SetNull)
+
+  visitAssets        VisitAsset[]
+  checklistResponses ChecklistResponse[]
+  issues             Issue[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("assets")
+}
+
+model Visit {
+  id            String        @id @default(uuid())
+  protocol      String        @unique
+  client        String
+  address       String
+  status        VisitStatus   @default(PLANEJADA)
+  priority      VisitPriority @default(MEDIA)
+  type          VisitType     @default(INSPECAO)
+  scheduledDate DateTime
+  scheduledTime String?
+  startedAt     DateTime?
+  completedAt   DateTime?
+  notes         String?
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  locationId String?
+  location   Location? @relation(fields: [locationId], references: [id], onDelete: SetNull)
+
+  technicianId String?
+  technician   User?   @relation(fields: [technicianId], references: [id], onDelete: SetNull)
+
+  visitAssets        VisitAsset[]
+  checklistResponses ChecklistResponse[]
+  issues             Issue[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("visits")
+}
+
+model VisitAsset {
+  id        String           @id @default(uuid())
+  visitId   String
+  visit     Visit            @relation(fields: [visitId], references: [id], onDelete: Cascade)
+  assetId   String?
+  asset     Asset?           @relation(fields: [assetId], references: [id], onDelete: SetNull)
+  status    VisitAssetStatus @default(ESPERADO)
+  notes     String?
+  photoUrl  String?
+  checkedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("visit_assets")
+}
+
+model ChecklistTemplate {
+  id          String          @id @default(uuid())
+  name        String
+  description String?
+  category    String          @default("Geral")
+  isActive    Boolean         @default(true)
+  items       ChecklistItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("checklist_templates")
+}
+
+model ChecklistItem {
+  id          String             @id @default(uuid())
+  templateId  String
+  template    ChecklistTemplate  @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  label       String
+  fieldType   ChecklistFieldType @default(YES_NO)
+  isRequired  Boolean            @default(false)
+  options     String?            // JSON string array for SELECT options
+  order       Int                @default(0)
+
+  responses ChecklistResponse[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("checklist_items")
+}
+
+model ChecklistResponse {
+  id              String        @id @default(uuid())
+  visitId         String
+  visit           Visit         @relation(fields: [visitId], references: [id], onDelete: Cascade)
+  checklistItemId String
+  checklistItem   ChecklistItem @relation(fields: [checklistItemId], references: [id], onDelete: Cascade)
+  assetId         String?
+  asset           Asset?        @relation(fields: [assetId], references: [id], onDelete: SetNull)
+  value           String
+  notes           String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("checklist_responses")
+}
+
+model Issue {
+  id             String        @id @default(uuid())
+  protocol       String?
+  title          String
+  description    String
+  severity       IssueSeverity @default(MEDIUM)
+  status         IssueStatus   @default(OPEN)
+  recommendation String?
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  visitId String?
+  visit   Visit?  @relation(fields: [visitId], references: [id], onDelete: SetNull)
+
+  assetId String?
+  asset   Asset?  @relation(fields: [assetId], references: [id], onDelete: SetNull)
+
+  locationId String?
+  location   Location? @relation(fields: [locationId], references: [id], onDelete: SetNull)
+
+  reportedById String?
+  reportedBy   User?   @relation(fields: [reportedById], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("issues")
+}

@@ -1,0 +1,17 @@
+{
+  "name": "infrafield",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "dev:api": "npm --workspace=apps/api run dev",
+    "dev:web": "npm --workspace=apps/web run dev",
+    "dev": "concurrently \"npm run dev:api\" \"npm run dev:web\"",
+    "build": "npm --workspaces run build"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}
