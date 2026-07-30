@@ -284,3 +284,17 @@ model Issue {
 
   @@map("issues")
 }
+
+model Notification {
+  id        String   @id @default(uuid())
+  title     String
+  message   String
+  type      String   @default("ALERT")
+  isRead    Boolean  @default(false)
+  assetId   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("notifications")
+}
+

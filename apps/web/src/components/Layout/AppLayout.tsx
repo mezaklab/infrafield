@@ -24,7 +24,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
   const getTitle = () => {
     switch (activeTab) {
       case 'dashboard':
-        return 'Dashboard de Operações';
+        return 'NOC // Prefeitura Municipal - Setor de TI';
       case 'assets':
         return 'Gestão de Ativos';
       case 'visits':

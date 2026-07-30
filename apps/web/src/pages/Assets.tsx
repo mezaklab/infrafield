@@ -20,10 +20,13 @@ import {
   Activity,
   FileText,
   Download,
-  Edit3
+  Edit3,
+  Monitor,
+  ExternalLink
 } from 'lucide-react';
 import { Asset, Location } from '../types';
 import { getAssets, createAsset, updateAsset, getLocations, downloadInventoryPDFReport, exportAssetsCSV } from '../services/api';
+import { getSocket, StatusUpdatedPayload } from '../services/socket';
 
 /**
  * Mapeamento MOCADO COM PNGs REAIS DE VERDADE com Fundo Transparente.
@@ -49,12 +52,22 @@ const REAL_ISOLATED_HARDWARE_PNGS: Record<string, string> = {
 };
 
 // Fallback visual transparente de altíssima definição em DataURI para modo offline
+// REGRA: ZERO <rect> de fundo. Apenas o silhouette do equipamento sobre canvas transparente.
 const FALLBACK_PHOTO_HARDWARE_DATA_URIS: Record<string, string> = {
-  'AP-WIFI-01': `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" fill="none"><g filter="drop-shadow(0px 8px 12px rgba(0,242,254,0.4))"><rect x="15" y="15" width="90" height="90" rx="22" fill="%23f8fafc" stroke="%23cbd5e1" stroke-width="2"/><rect x="25" y="25" width="70" height="70" rx="16" fill="%23f1f5f9"/><circle cx="60" cy="60" r="18" fill="%23ffffff" stroke="%23e2e8f0" stroke-width="2"/><text x="60" y="58" font-family="sans-serif" font-weight="900" font-size="8.5" fill="%23f59e0b" text-anchor="middle">aruba</text><text x="60" y="67" font-family="sans-serif" font-weight="700" font-size="6" fill="%2364748b" text-anchor="middle">AP-515</text><circle cx="60" cy="85" r="3" fill="%2310b981"/></g></svg>`,
-  'SW-CORE-01': `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 65" fill="none"><g filter="drop-shadow(0px 6px 12px rgba(0,242,254,0.45))"><rect x="5" y="10" width="190" height="45" rx="5" fill="%231e293b" stroke="%230284c7" stroke-width="2"/><rect x="10" y="15" width="180" height="35" rx="3" fill="%230f172a"/><text x="18" y="32" font-family="sans-serif" font-weight="900" font-size="10" fill="%2338bdf8">cisco</text><text x="18" y="42" font-family="sans-serif" font-weight="700" font-size="6.5" fill="%2394a3b8">Catalyst 9300</text><g fill="%230284c7"><rect x="75" y="20" width="6" height="9" rx="1"/><rect x="84" y="20" width="6" height="9" rx="1"/><rect x="93" y="20" width="6" height="9" rx="1"/><rect x="102" y="20" width="6" height="9" rx="1"/><rect x="111" y="20" width="6" height="9" rx="1"/><rect x="75" y="32" width="6" height="9" rx="1"/><rect x="84" y="32" width="6" height="9" rx="1"/><rect x="93" y="32" width="6" height="9" rx="1"/><rect x="102" y="32" width="6" height="9" rx="1"/><rect x="111" y="32" width="6" height="9" rx="1"/></g><rect x="135" y="22" width="18" height="20" rx="2" fill="%23f59e0b" fill-opacity="0.4" stroke="%23f59e0b"/><rect x="158" y="22" width="18" height="20" rx="2" fill="%2310b981" fill-opacity="0.4" stroke="%2310b981"/></g></svg>`,
-  'FW-EDGE-01': `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 65" fill="none"><g filter="drop-shadow(0px 6px 12px rgba(0,242,254,0.45))"><rect x="5" y="10" width="190" height="45" rx="5" fill="%23f8fafc" stroke="%23e2e8f0" stroke-width="2"/><rect x="10" y="15" width="180" height="35" rx="3" fill="%23ffffff"/><text x="18" y="32" font-family="sans-serif" font-weight="900" font-size="10" fill="%23ef4444">FORTINET</text><text x="18" y="42" font-family="sans-serif" font-weight="700" font-size="6.5" fill="%2364748b">FortiGate 100F</text><circle cx="105" cy="32" r="3.5" fill="%2310b981"/><circle cx="118" cy="32" r="3.5" fill="%2310b981"/><rect x="138" y="22" width="38" height="20" rx="3" fill="%230f172a" stroke="%236366f1"/></g></svg>`,
-  'SAN-STOR-01': `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 85" fill="none"><g filter="drop-shadow(0px 8px 14px rgba(0,242,254,0.45))"><rect x="5" y="10" width="190" height="65" rx="6" fill="%231e293b" stroke="%23a855f7" stroke-width="2"/><rect x="12" y="18" width="150" height="12" rx="2" fill="%230f172a" stroke="%23a855f7" stroke-opacity="0.6"/><rect x="12" y="36" width="150" height="12" rx="2" fill="%230f172a" stroke="%23a855f7" stroke-opacity="0.6"/><rect x="12" y="54" width="150" height="12" rx="2" fill="%230f172a" stroke="%23a855f7" stroke-opacity="0.6"/><circle cx="174" cy="24" r="3" fill="%23a855f7"/><circle cx="174" cy="42" r="3" fill="%2310b981"/><circle cx="174" cy="60" r="3" fill="%2300f2fe"/></g></svg>`,
-  'SRV-VM-01': `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 85" fill="none"><g filter="drop-shadow(0px 8px 14px rgba(0,242,254,0.45))"><rect x="5" y="12" width="190" height="60" rx="6" fill="%231e293b" stroke="%2338bdf8" stroke-width="2"/><rect x="12" y="20" width="24" height="44" rx="3" fill="%230f172a" stroke="%23475569"/><rect x="40" y="20" width="24" height="44" rx="3" fill="%230f172a" stroke="%23475569"/><rect x="68" y="20" width="24" height="44" rx="3" fill="%230f172a" stroke="%23475569"/><text x="104" y="38" font-family="sans-serif" font-weight="900" font-size="11" fill="%2300f2fe">DELL</text><text x="104" y="50" font-family="sans-serif" font-weight="700" font-size="7.5" fill="%2394a3b8">PowerEdge R750</text><circle cx="168" cy="32" r="3.5" fill="%2310b981"/><circle cx="168" cy="46" r="3.5" fill="%2300f2fe"/></g></svg>`,
+  // Access Point — silhouette oval/dome transparente
+  'AP-WIFI-01': `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 80" fill="none"><ellipse cx="60" cy="62" rx="44" ry="10" fill="%2300f2fe" fill-opacity="0.18"/><rect x="22" y="44" width="76" height="20" rx="10" fill="%230f172a" stroke="%2300f2fe" stroke-width="1.5"/><rect x="30" y="50" width="6" height="6" rx="1.5" fill="%2310b981"/><rect x="40" y="50" width="6" height="6" rx="1.5" fill="%2310b981"/><rect x="50" y="50" width="6" height="6" rx="1.5" fill="%2310b981"/><text x="84" y="57" font-family="sans-serif" font-weight="900" font-size="7" fill="%2300f2fe" text-anchor="middle">AP</text><path d="M60 44 Q60 28 60 20" stroke="%2300f2fe" stroke-width="1.5" stroke-dasharray="3 2"/><circle cx="60" cy="18" r="3" fill="%2300f2fe"/><path d="M45 36 Q52 24 60 20 Q68 24 75 36" stroke="%2300f2fe" stroke-width="1.2" fill="none" opacity="0.6"/><path d="M38 40 Q50 20 60 14 Q70 20 82 40" stroke="%2300f2fe" stroke-width="1" fill="none" opacity="0.35"/></svg>`,
+
+  // Switch rack 1U — silhouette de bandeja sem fundo
+  'SW-CORE-01': `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 60" fill="none"><rect x="4" y="14" width="192" height="32" rx="4" fill="%230f172a" stroke="%2300bcd4" stroke-width="1.5"/><rect x="10" y="20" width="55" height="20" rx="2" fill="%23071020"/><text x="37" y="32" font-family="monospace" font-weight="900" font-size="9" fill="%2338bdf8" text-anchor="middle">cisco</text><text x="37" y="40" font-family="monospace" font-size="5.5" fill="%2394a3b8" text-anchor="middle">9300</text><g fill="%2300bcd4"><rect x="72" y="21" width="5" height="8" rx="1"/><rect x="80" y="21" width="5" height="8" rx="1"/><rect x="88" y="21" width="5" height="8" rx="1"/><rect x="96" y="21" width="5" height="8" rx="1"/><rect x="104" y="21" width="5" height="8" rx="1"/><rect x="112" y="21" width="5" height="8" rx="1"/><rect x="72" y="32" width="5" height="8" rx="1"/><rect x="80" y="32" width="5" height="8" rx="1"/><rect x="88" y="32" width="5" height="8" rx="1"/><rect x="96" y="32" width="5" height="8" rx="1"/><rect x="104" y="32" width="5" height="8" rx="1"/><rect x="112" y="32" width="5" height="8" rx="1"/></g><circle cx="145" cy="25" r="3" fill="%2310b981"/><circle cx="155" cy="25" r="3" fill="%2310b981"/><circle cx="165" cy="25" r="3" fill="%23f59e0b"/><rect x="140" y="32" width="30" height="8" rx="2" fill="%23071020" stroke="%2300bcd4" stroke-opacity="0.5"/><rect x="2" y="12" width="4" height="36" rx="2" fill="%231e293b"/><rect x="194" y="12" width="4" height="36" rx="2" fill="%231e293b"/></svg>`,
+
+  // Firewall rack 1U — placa branca com texto FORTINET
+  'FW-EDGE-01': `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 60" fill="none"><rect x="4" y="14" width="192" height="32" rx="4" fill="%23f0f4f8" stroke="%23e2e8f0" stroke-width="1.5"/><rect x="10" y="20" width="70" height="20" rx="2" fill="%23e2e8f0"/><text x="45" y="32" font-family="sans-serif" font-weight="900" font-size="9" fill="%23ef4444" text-anchor="middle">FORTINET</text><text x="45" y="40" font-family="sans-serif" font-size="5.5" fill="%2364748b" text-anchor="middle">FortiGate 100F</text><circle cx="100" cy="28" r="3" fill="%2310b981"/><circle cx="112" cy="28" r="3" fill="%2310b981"/><circle cx="124" cy="28" r="3" fill="%2310b981"/><rect x="138" y="20" width="42" height="20" rx="3" fill="%23071020" stroke="%236366f1" stroke-width="1"/><text x="159" y="32" font-family="monospace" font-size="6" fill="%236366f1" text-anchor="middle">USB  CFG</text><rect x="2" y="12" width="4" height="36" rx="2" fill="%23cbd5e1"/><rect x="194" y="12" width="4" height="36" rx="2" fill="%23cbd5e1"/></svg>`,
+
+  // Storage — chassi 2U com drives visíveis
+  'SAN-STOR-01': `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 80" fill="none"><rect x="4" y="8" width="192" height="64" rx="5" fill="%230a1628" stroke="%23a855f7" stroke-width="1.5"/><rect x="2" y="6" width="4" height="68" rx="2" fill="%23172033"/><rect x="194" y="6" width="4" height="68" rx="2" fill="%23172033"/><rect x="12" y="16" width="148" height="12" rx="2" fill="%23071020" stroke="%23a855f7" stroke-opacity="0.7"/><circle cx="168" cy="22" r="3" fill="%23a855f7"/><rect x="12" y="34" width="148" height="12" rx="2" fill="%23071020" stroke="%23a855f7" stroke-opacity="0.7"/><circle cx="168" cy="40" r="3" fill="%2310b981"/><rect x="12" y="52" width="148" height="12" rx="2" fill="%23071020" stroke="%23a855f7" stroke-opacity="0.7"/><circle cx="168" cy="58" r="3" fill="%2300f2fe"/><text x="86" y="25" font-family="monospace" font-size="6" fill="%23a855f7" text-anchor="middle">DELL POWERVAULT ME5024</text></svg>`,
+
+  // Servidor 2U rack — drives frontais + LEDs
+  'SRV-VM-01': `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 80" fill="none"><rect x="4" y="8" width="192" height="64" rx="5" fill="%230a1628" stroke="%2338bdf8" stroke-width="1.5"/><rect x="2" y="6" width="4" height="68" rx="2" fill="%23172033"/><rect x="194" y="6" width="4" height="68" rx="2" fill="%23172033"/><rect x="10" y="14" width="18" height="52" rx="2" fill="%23071020" stroke="%23334155"/><rect x="32" y="14" width="18" height="52" rx="2" fill="%23071020" stroke="%23334155"/><rect x="54" y="14" width="18" height="52" rx="2" fill="%23071020" stroke="%23334155"/><text x="120" y="36" font-family="sans-serif" font-weight="900" font-size="11" fill="%2300f2fe" text-anchor="middle">DELL</text><text x="120" y="48" font-family="sans-serif" font-size="7" fill="%2394a3b8" text-anchor="middle">PowerEdge R750</text><circle cx="162" cy="30" r="3.5" fill="%2310b981"/><circle cx="175" cy="30" r="3.5" fill="%2300f2fe"/><rect x="156" y="42" width="28" height="14" rx="2" fill="%23071020" stroke="%2338bdf8" stroke-opacity="0.5"/></svg>`,
 };
 
 export const Assets: React.FC = () => {
@@ -86,6 +99,8 @@ export const Assets: React.FC = () => {
     imageUrl: '',
   });
 
+
+
   const fetchData = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -110,6 +125,43 @@ export const Assets: React.FC = () => {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  // Sincronização em tempo real via WebSockets (Socket.IO)
+  useEffect(() => {
+    const socket = getSocket();
+
+    const handleStatusUpdated = (payload: StatusUpdatedPayload) => {
+      console.log('⚡ [Assets WebSockets] Evento statusUpdated recebido:', payload);
+
+      setAssets((prevAssets) =>
+        prevAssets.map((asset) => {
+          if (asset.id === payload.id || asset.code === payload.code) {
+            return {
+              ...asset,
+              status: payload.status as Asset['status'],
+            };
+          }
+          return asset;
+        })
+      );
+
+      setSelectedAsset((prevSelected) => {
+        if (prevSelected && (prevSelected.id === payload.id || prevSelected.code === payload.code)) {
+          return {
+            ...prevSelected,
+            status: payload.status as Asset['status'],
+          };
+        }
+        return prevSelected;
+      });
+    };
+
+    socket.on('statusUpdated', handleStatusUpdated);
+
+    return () => {
+      socket.off('statusUpdated', handleStatusUpdated);
+    };
+  }, []);
 
   const handleOpenCreateModal = () => {
     setEditingAssetId(null);
@@ -145,6 +197,8 @@ export const Assets: React.FC = () => {
     setSelectedAsset(null);
     setIsModalOpen(true);
   };
+
+
 
   const handleSaveAsset = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -459,22 +513,18 @@ export const Assets: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* 2. REGRA 3: CORREÇÃO VISUAL DO GLOW (Sem div bg-slate-800, sem border, sem box-shadow quadrado) */}
+                  {/* Container transparente — drop-shadow segue o canal alpha do PNG */}
                   <div className="flex items-start gap-4 my-2">
-                    <div className="relative w-24 shrink-0 flex flex-col items-center justify-center pointer-events-none select-none pb-3 pt-1">
-                      {/* Imagem do equipamento com filtro drop-shadow direto na tag <img> */}
+                    <div className="relative w-24 h-20 shrink-0 flex items-center justify-center pointer-events-none select-none">
                       <img
                         src={equipmentImg}
                         alt={asset.name}
                         onError={(e) => {
                           (e.target as HTMLImageElement).src = fallbackDataURI;
                         }}
-                        style={{ filter: 'drop-shadow(0px 8px 12px rgba(0, 242, 254, 0.4))' }}
-                        className="relative z-10 max-w-full h-16 object-contain transform group-hover:scale-110 transition-transform duration-300"
+                        className="w-full h-full object-contain bg-transparent drop-shadow-[0_0_15px_rgba(0,240,255,0.5)]"
                       />
-
-                      {/* Pedestal Luminoso Elipse Arredondada (rounded-full, blur-md) na base (absolute bottom-0) */}
-                      <div className="absolute bottom-0 w-20 h-2.5 rounded-full bg-[#00f2fe]/80 blur-md shadow-[0_0_16px_#00f2fe] pointer-events-none"></div>
+                      <div className="absolute bottom-0 w-full h-2 rounded-full bg-[#00f2fe]/40 blur-md pointer-events-none"></div>
                     </div>
 
                     {/* ESTRUTURA DOS TEXTOS (Lado direito da foto) */}
@@ -520,14 +570,27 @@ export const Assets: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Rodapé: Botão Ver detalhes discreto */}
-                <div className="mt-4 pt-2.5 border-t border-slate-800/60 flex items-center justify-between">
-                  <span className="text-[10px] text-slate-500 font-mono">
-                    S/N: {asset.serialNumber}
-                  </span>
+                {/* Rodapé: Botões Acesso Remoto & Ver detalhes */}
+                <div className="mt-4 pt-2.5 border-t border-slate-800/60 flex items-center justify-between gap-2">
+                  <a
+                    href={
+                      asset.ipAddress?.startsWith('http')
+                        ? asset.ipAddress
+                        : `http://${asset.ipAddress || asset.hostname || '127.0.0.1'}`
+                    }
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-[11px] font-semibold text-[#00f2fe] bg-[#00f2fe]/10 hover:bg-[#00f2fe]/20 border border-[#00f2fe]/30 px-2.5 py-1 rounded-lg flex items-center gap-1.5 transition-all cursor-pointer"
+                    title={`Abrir Interface de Gerência (${asset.ipAddress || asset.hostname || '127.0.0.1'}) em nova aba`}
+                  >
+                    <Monitor className="w-3.5 h-3.5 text-[#00f2fe]" />
+                    <span>Acesso Remoto</span>
+                    <ExternalLink className="w-3 h-3 opacity-70" />
+                  </a>
+
                   <button
                     onClick={() => setSelectedAsset(asset)}
-                    className="text-xs font-semibold text-slate-400 hover:text-[#00f2fe] flex items-center gap-1 transition-colors group-hover:translate-x-0.5"
+                    className="text-xs font-semibold text-slate-400 hover:text-[#00f2fe] flex items-center gap-1 transition-colors group-hover:translate-x-0.5 cursor-pointer"
                   >
                     <span>Ver detalhes</span>
                     <ArrowRight className="w-3.5 h-3.5 text-[#00f2fe]" />
@@ -550,19 +613,16 @@ export const Assets: React.FC = () => {
               <X className="w-4 h-4" />
             </button>
             <div className="flex items-center gap-3 mb-4">
-              <div className="relative w-20 shrink-0 flex flex-col items-center justify-center pointer-events-none select-none pb-2 pt-1">
+              <div className="relative w-20 h-20 shrink-0 flex items-center justify-center pointer-events-none select-none">
                 <img
                   src={getExactIsolatedEquipmentImage(selectedAsset.code, selectedAsset.category, selectedAsset.name, selectedAsset.imageUrl)}
                   alt={selectedAsset.name}
                   onError={(e) => {
                     (e.target as HTMLImageElement).src = getFallbackDataURI(selectedAsset.code, selectedAsset.category, selectedAsset.name);
                   }}
-                  style={{ filter: 'drop-shadow(0px 8px 12px rgba(0, 242, 254, 0.4))' }}
-                  className="relative z-10 max-w-full h-12 object-contain"
+                  className="w-full h-full object-contain bg-transparent drop-shadow-[0_0_15px_rgba(0,240,255,0.5)]"
                 />
-
-                {/* Pedestal Luminoso Elipse Arredondada (rounded-full, blur-md) na base (absolute bottom-0) */}
-                <div className="absolute bottom-0 w-16 h-2 rounded-full bg-[#00f2fe]/80 blur-md shadow-[0_0_14px_#00f2fe] pointer-events-none"></div>
+                <div className="absolute bottom-0 w-full h-1.5 rounded-full bg-[#00f2fe]/40 blur-md pointer-events-none"></div>
               </div>
               <div>
                 <span className="text-xs font-mono font-bold text-[#00f2fe] bg-[#00f2fe]/10 border border-[#00f2fe]/20 px-2.5 py-0.5 rounded-lg">
@@ -750,58 +810,41 @@ export const Assets: React.FC = () => {
                 </select>
               </div>
 
-              {/* REGRA 1: CAMPO 'imageUrl' DIRETO NO FORMULÁRIO */}
-              <div className="bg-[#050811] p-3.5 rounded-2xl border border-slate-800 space-y-2.5">
-                <div>
-                  <label className="block text-xs font-bold text-slate-200 mb-1">
-                    URL da Foto do Equipamento (PNG Transparente) (<code className="text-[#00f2fe]">imageUrl</code>)
-                  </label>
-                  <input
-                    type="text"
-                    value={assetForm.imageUrl}
-                    onChange={(e) => setAssetForm({ ...assetForm, imageUrl: e.target.value })}
-                    placeholder="URL direta da imagem PNG do equipamento (ex: https://site.com/foto.png)..."
-                    className="w-full bg-[#080d1a] border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-[#00f2fe]"
-                  />
-                </div>
+              {/* FOTO DO EQUIPAMENTO — Biblioteca Local de Assets (Enterprise) */}
+              <div className="bg-[#050811] p-3.5 rounded-2xl border border-slate-800 space-y-3">
+                <label className="block text-xs font-bold text-slate-200">
+                  Foto do Equipamento
+                </label>
 
-                <div>
-                  <label className="block text-[11px] font-semibold text-slate-400 mb-1">
-                    Ou selecione um modelo preset de foto PNG real com fundo transparente:
-                  </label>
-                  <select
-                    value={assetForm.imageUrl}
-                    onChange={(e) => setAssetForm({ ...assetForm, imageUrl: e.target.value })}
-                    className="w-full bg-[#080d1a] border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-slate-300"
-                  >
-                    <option value="">Detecção Automática (Inteligente por Nome/Categoria)</option>
-                    <option value={REAL_ISOLATED_HARDWARE_PNGS['AP-WIFI-01']}>Access Point (Aruba AP-515 / Intelbras AP)</option>
-                    <option value={REAL_ISOLATED_HARDWARE_PNGS['SW-CORE-01']}>Switch de Rack (Cisco Catalyst / Intelbras SW)</option>
-                    <option value={REAL_ISOLATED_HARDWARE_PNGS['FW-EDGE-01']}>Firewall (Fortinet FortiGate 100F)</option>
-                    <option value={REAL_ISOLATED_HARDWARE_PNGS['SAN-STOR-01']}>Storage (Dell PowerVault ME5024)</option>
-                    <option value={REAL_ISOLATED_HARDWARE_PNGS['SRV-VM-01']}>Servidor (Dell PowerEdge R750)</option>
-                  </select>
-                </div>
+                <select
+                  value={assetForm.imageUrl}
+                  onChange={(e) => setAssetForm({ ...assetForm, imageUrl: e.target.value })}
+                  className="w-full bg-[#080d1a] border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-300 focus:outline-none focus:border-[#00f2fe]"
+                >
+                  <option value="">Detecção Automática (por Nome / Categoria)</option>
+                  <option value={REAL_ISOLATED_HARDWARE_PNGS['AP-WIFI-01']}>Access Point — Aruba AP-515 / Intelbras AP</option>
+                  <option value={REAL_ISOLATED_HARDWARE_PNGS['SW-CORE-01']}>Switch de Rack — Cisco Catalyst / Intelbras SW</option>
+                  <option value={REAL_ISOLATED_HARDWARE_PNGS['FW-EDGE-01']}>Firewall — Fortinet FortiGate 100F</option>
+                  <option value={REAL_ISOLATED_HARDWARE_PNGS['SAN-STOR-01']}>Storage — Dell PowerVault ME5024</option>
+                  <option value={REAL_ISOLATED_HARDWARE_PNGS['SRV-VM-01']}>Servidor — Dell PowerEdge R750</option>
+                </select>
 
-                {/* REGRA 3: PREVIEW COM GLOW E PEDESTAL ELIPSE NA BASE */}
-                <div className="flex items-center gap-4 pt-1 border-t border-slate-800/80">
-                  <div className="relative w-20 shrink-0 flex flex-col items-center justify-center pointer-events-none select-none pb-2 pt-1">
+                {/* Preview ao vivo */}
+                <div className="flex items-center gap-4 pt-2 border-t border-slate-800/80">
+                  <div className="relative w-20 shrink-0 h-16 flex items-center justify-center pointer-events-none select-none">
                     <img
                       src={getExactIsolatedEquipmentImage(assetForm.code, assetForm.category, assetForm.name, assetForm.imageUrl)}
                       alt="Preview"
                       onError={(e) => {
                         (e.target as HTMLImageElement).src = getFallbackDataURI(assetForm.code, assetForm.category, assetForm.name);
                       }}
-                      style={{ filter: 'drop-shadow(0px 8px 12px rgba(0, 242, 254, 0.4))' }}
-                      className="relative z-10 max-w-full h-12 object-contain"
+                      className="w-16 h-14 object-contain [filter:drop-shadow(0_0_12px_rgba(0,240,255,0.55))_drop-shadow(0_0_4px_rgba(0,240,255,0.35))]"
                     />
-
-                    {/* Pedestal Luminoso Elipse Arredondada (rounded-full, blur-md) na base (absolute bottom-0) */}
-                    <div className="absolute bottom-0 w-16 h-2 rounded-full bg-[#00f2fe]/80 blur-md shadow-[0_0_14px_#00f2fe] pointer-events-none"></div>
+                    <div className="absolute bottom-0 w-16 h-1.5 rounded-full bg-[#00f2fe]/60 blur-md pointer-events-none"></div>
                   </div>
-                  <div className="text-[11px] text-slate-400">
-                    <span className="text-[#00f2fe] font-bold block">Preview do Equipamento</span>
-                    PNG real transparente solto sem fundo quadrado com pedestal neon ciano.
+                  <div className="text-[11px] text-slate-400 space-y-0.5">
+                    <span className="text-[#00f2fe] font-bold block">Preview</span>
+                    <span>Imagem PNG isolada da biblioteca local.<br/>Atualiza ao trocar o modelo acima.</span>
                   </div>
                 </div>
               </div>

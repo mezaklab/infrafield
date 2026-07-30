@@ -135,3 +135,14 @@ export interface Issue {
   reportedBy?: string;
   createdAt: string;
 }
+
+export interface NotificationItem {
+  id: string;
+  title: string;
+  message: string;
+  type: 'ALERT' | 'WARNING' | 'SUCCESS' | 'INFO';
+  isRead: boolean;
+  assetId?: string;
+  createdAt: string;
+}
+

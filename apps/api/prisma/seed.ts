@@ -10,11 +10,19 @@ import {
   IssueSeverity,
   IssueStatus
 } from '@prisma/client';
+import bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
 
 async function main() {
   console.log('🌱 Starting InfraField v0.4 Database Seeding...');
+
+  const HASH_ROUNDS = 10;
+  const adminPasswordHash = await bcrypt.hash('admin123', HASH_ROUNDS);
+  const techPasswordHash = await bcrypt.hash('tecnico123', HASH_ROUNDS);
+  const managerPasswordHash = await bcrypt.hash('gestor123', HASH_ROUNDS);
+  const viewerPasswordHash = await bcrypt.hash('viewer123', HASH_ROUNDS);
+
 
   // Clean existing tables in reverse order of foreign keys
   await prisma.issue.deleteMany();
@@ -64,7 +72,7 @@ async function main() {
     data: {
       name: 'Administrador InfraField',
       email: 'admin@infrafield.io',
-      password: 'password123',
+      password: adminPasswordHash,
       role: Role.ADMIN,
       companyId: company.id,
     },
@@ -74,7 +82,7 @@ async function main() {
     data: {
       name: 'Carlos Silva (Técnico)',
       email: 'carlos.silva@infrafield.io',
-      password: 'password123',
+      password: techPasswordHash,
       role: Role.TECHNICIAN,
       companyId: company.id,
     },
@@ -84,7 +92,7 @@ async function main() {
     data: {
       name: 'Mariana Costa (Gerente)',
       email: 'mariana.costa@infrafield.io',
-      password: 'password123',
+      password: managerPasswordHash,
       role: Role.MANAGER,
       companyId: company.id,
     },
@@ -94,7 +102,7 @@ async function main() {
     data: {
       name: 'Lucas Andrade (Auditor)',
       email: 'lucas.andrade@infrafield.io',
-      password: 'password123',
+      password: viewerPasswordHash,
       role: Role.VIEWER,
       companyId: company.id,
     },
@@ -334,7 +342,33 @@ async function main() {
       reportedById: tech.id,
     },
   });
-  console.log('✅ 2 Issues created:', [issue1.protocol, issue2.protocol].join(', '));
+  // 8. Create Sample Notifications
+  await prisma.notification.deleteMany();
+  await prisma.notification.createMany({
+    data: [
+      {
+        title: '🚨 Alerta de Falha ICMP: SAN-STOR-01',
+        message: 'O equipamento Storage Dell PowerVault ME5024 (192.168.1.50) parou de responder ao ping e entrou em estado CRÍTICO.',
+        type: 'ALERT',
+        isRead: false,
+        assetId: asset4.id,
+      },
+      {
+        title: '⚠️ Temperatura Elevada no Datacenter',
+        message: 'Sensor de exaustão do Rack 02 registrou 34°C. Recomendada vistoria imediata.',
+        type: 'WARNING',
+        isRead: false,
+        assetId: asset1.id,
+      },
+      {
+        title: '🟢 Sincronização em Tempo Real Ativa',
+        message: 'Conexão WebSocket Socket.IO estabelecida com sucesso no Centro de Operações de Rede.',
+        type: 'SUCCESS',
+        isRead: true,
+      },
+    ],
+  });
+  console.log('✅ 3 Notifications created.');
   console.log('🎉 Seeding v0.4 completed successfully!');
 }
 

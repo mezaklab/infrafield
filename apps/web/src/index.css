@@ -78,8 +78,71 @@ input:focus, select:focus, textarea:focus {
   }
 }
 
+/* Telemetry Heartbeat & Signal Wave Pulse Keyframes */
+@keyframes heartbeatPulse {
+  0% {
+    transform: scale(1);
+    opacity: 1;
+    filter: drop-shadow(0 0 2px currentColor);
+  }
+  14% {
+    transform: scale(1.2);
+    opacity: 1;
+    filter: drop-shadow(0 0 10px currentColor);
+  }
+  28% {
+    transform: scale(1);
+    opacity: 0.85;
+    filter: drop-shadow(0 0 3px currentColor);
+  }
+  42% {
+    transform: scale(1.14);
+    opacity: 1;
+    filter: drop-shadow(0 0 8px currentColor);
+  }
+  56%, 100% {
+    transform: scale(1);
+    opacity: 0.9;
+    filter: drop-shadow(0 0 2px currentColor);
+  }
+}
+
+/* Real-time Flowing Waveform (EKG / Telemetry Pulse Line) Animation */
+@keyframes ecgLineRunner {
+  0% {
+    stroke-dashoffset: 160;
+  }
+  100% {
+    stroke-dashoffset: 0;
+  }
+}
+
+.animate-ecg-line {
+  stroke-dasharray: 40 120;
+  animation: ecgLineRunner 1.5s linear infinite;
+  filter: drop-shadow(0 0 6px currentColor);
+}
+
+.animate-ecg-line-fast {
+  stroke-dasharray: 40 120;
+  animation: ecgLineRunner 1s linear infinite;
+  filter: drop-shadow(0 0 8px currentColor);
+}
+
 .noc-pulse {
   animation: nocPulse 3s infinite ease-in-out;
+}
+
+.animate-heartbeat {
+  animation: heartbeatPulse 2.2s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+  transform-origin: center;
+  display: inline-block;
+}
+
+.animate-signal-wave {
+  animation: signalWave 1.8s ease-in-out infinite;
+  transform-origin: center;
+  display: inline-block;
 }
 
 /* Button Technical Micro-Interactions */

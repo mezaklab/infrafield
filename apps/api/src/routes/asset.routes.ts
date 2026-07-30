@@ -2,6 +2,8 @@ import { Router, Request, Response } from 'express';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma';
 import { AssetStatus } from '@prisma/client';
+import { processAndSaveEquipmentImage } from '../services/imageProcessor.service';
+import { emitAssetStatusUpdate } from '../services/websocket.service';
 
 export const assetRouter = Router();
 
@@ -113,6 +115,20 @@ assetRouter.post('/', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Já existe um ativo com este código de identificação' });
     }
 
+    let imageUrl = parsed.data.imageUrl;
+
+    // Process image to remove white background and convert to transparent local PNG if provided as remote URL
+    if (imageUrl && !imageUrl.startsWith('/uploads/assets/')) {
+      try {
+        const processedUrl = await processAndSaveEquipmentImage(imageUrl);
+        if (processedUrl) {
+          imageUrl = processedUrl;
+        }
+      } catch (procErr) {
+        console.warn('Image background removal on creation failed, preserving original URL:', procErr);
+      }
+    }
+
     const newAsset = await prisma.asset.create({
       data: {
         name: parsed.data.name,
@@ -126,7 +142,7 @@ assetRouter.post('/', async (req: Request, res: Response) => {
         locationId: parsed.data.locationId,
         companyId,
         assignedToId: parsed.data.assignedToId,
-        imageUrl: parsed.data.imageUrl,
+        imageUrl,
       },
       include: {
         location: { select: { id: true, name: true } },
@@ -150,14 +166,37 @@ assetRouter.patch('/:id', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Dados inválidos', details: parsed.error.format() });
     }
 
+    const updateData = { ...parsed.data };
+
+    if (updateData.imageUrl && !updateData.imageUrl.startsWith('/uploads/assets/')) {
+      try {
+        const processedUrl = await processAndSaveEquipmentImage(updateData.imageUrl, id);
+        if (processedUrl) {
+          updateData.imageUrl = processedUrl;
+        }
+      } catch (procErr) {
+        console.warn('Image background removal on update failed, preserving original URL:', procErr);
+      }
+    }
+
     const updated = await prisma.asset.update({
       where: { id },
-      data: parsed.data,
+      data: updateData,
       include: {
         location: { select: { id: true, name: true } },
         assignedTo: { select: { id: true, name: true } },
       },
     });
+
+    if (parsed.data.status) {
+      emitAssetStatusUpdate({
+        id: updated.id,
+        code: updated.code,
+        name: updated.name,
+        status: updated.status,
+        ipAddress: updated.ipAddress,
+      });
+    }
 
     return res.json(updated);
   } catch (error) {

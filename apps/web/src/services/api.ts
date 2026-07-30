@@ -10,7 +10,8 @@ import {
   ChecklistResponse,
   Issue,
   IssueSeverity,
-  IssueStatus
+  IssueStatus,
+  NotificationItem
 } from '../types';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3333/api';
@@ -114,6 +115,16 @@ export const updateAsset = async (id: string, data: Partial<{
   imageUrl: string;
 }>): Promise<any> => {
   const response = await api.patch(`/assets/${id}`, data);
+  return response.data;
+};
+
+export const searchAssetImages = async (query: string): Promise<Array<{ title: string; url: string; thumbnailUrl?: string; source: string }>> => {
+  const response = await api.get('/assets/search-images', { params: { q: query } });
+  return response.data;
+};
+
+export const autoFetchAssetImage = async (id: string): Promise<any> => {
+  const response = await api.post(`/assets/${id}/auto-image`);
   return response.data;
 };
 
@@ -294,3 +305,16 @@ export const exportAssetsCSV = () => {
   const url = `${API_BASE_URL}/reports/assets/export`;
   window.open(url, '_blank');
 };
+
+/* --- NOTIFICATION APIS --- */
+
+export const getNotifications = async (): Promise<NotificationItem[]> => {
+  const response = await api.get('/notifications');
+  return response.data;
+};
+
+export const markNotificationsAsRead = async (): Promise<NotificationItem[]> => {
+  const response = await api.patch('/notifications/mark-as-read');
+  return response.data.notifications || response.data;
+};
+
