@@ -21,11 +21,12 @@ import {
   FileText,
   Download,
   Edit3,
+  Trash2,
   Monitor,
   ExternalLink
 } from 'lucide-react';
 import { Asset, Location } from '../types';
-import { getAssets, createAsset, updateAsset, getLocations, downloadInventoryPDFReport, exportAssetsCSV } from '../services/api';
+import { getAssets, createAsset, updateAsset, deleteAsset, getLocations, downloadInventoryPDFReport, exportAssetsCSV } from '../services/api';
 import { getSocket, StatusUpdatedPayload } from '../services/socket';
 
 /**
@@ -97,6 +98,7 @@ export const Assets: React.FC = () => {
     locationId: '',
     status: 'OPERATIONAL',
     imageUrl: '',
+    wifiBands: '',
   });
 
 
@@ -176,6 +178,7 @@ export const Assets: React.FC = () => {
       locationId: locations[0]?.id || '',
       status: 'OPERATIONAL',
       imageUrl: '',
+      wifiBands: '',
     });
     setIsModalOpen(true);
   };
@@ -193,12 +196,25 @@ export const Assets: React.FC = () => {
       locationId: asset.locationId || '',
       status: asset.status,
       imageUrl: asset.imageUrl || '',
+      wifiBands: asset.wifiBands || '',
     });
     setSelectedAsset(null);
     setIsModalOpen(true);
   };
 
-
+  const handleDeleteAsset = async (id: string, name: string) => {
+    if (window.confirm(`Deseja realmente excluir o ativo de rede "${name}"?`)) {
+      try {
+        await deleteAsset(id);
+        if (selectedAsset?.id === id) {
+          setSelectedAsset(null);
+        }
+        fetchData();
+      } catch (err: any) {
+        alert(err.response?.data?.error || 'Erro ao excluir ativo');
+      }
+    }
+  };
 
   const handleSaveAsset = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -315,8 +331,19 @@ export const Assets: React.FC = () => {
     return <Cpu className="w-4 h-4 text-[#00f2fe]" />;
   };
 
-  const getCategoryMetrics = (category: string) => {
-    const cat = category.toLowerCase();
+  const getCategoryMetrics = (asset: Asset) => {
+    const cat = (asset.category || '').toLowerCase();
+    const name = (asset.name || '').toLowerCase();
+
+    // Access Point / Wireless Asset
+    if (cat.includes('sem fio') || cat.includes('wifi') || cat.includes('access') || name.includes('ap-') || name.includes('aruba ap') || asset.wifiBands) {
+      const bands = asset.wifiBands || '2.4GHz / 5GHz';
+      return [
+        { label: 'Banda/Freq.', value: bands },
+        { label: 'Clientes Wi-Fi', value: '28 Ativos' },
+        { label: 'Sinal Rádio', value: '-42 dBm (4x4)' },
+      ];
+    }
     if (cat.includes('servidor')) {
       return [
         { label: 'CPU', value: '18%' },
@@ -328,14 +355,14 @@ export const Assets: React.FC = () => {
       return [
         { label: 'Portas', value: '42/48' },
         { label: 'Ping', value: '1ms' },
-        { label: 'Banda', value: '2.4 Gbps' },
+        { label: 'Backbone', value: '10 Gbps' },
       ];
     }
     if (cat.includes('segurança') || cat.includes('firewall')) {
       return [
         { label: 'Sessões', value: '1.2k' },
         { label: 'Latência', value: '2ms' },
-        { label: 'Regras', value: 'OK' },
+        { label: 'Regras IPS', value: 'OK' },
       ];
     }
     if (cat.includes('storage') || cat.includes('armazenamento')) {
@@ -346,8 +373,8 @@ export const Assets: React.FC = () => {
       ];
     }
     return [
-      { label: 'Clientes', value: '28' },
-      { label: 'Sinal', value: '-42 dBm' },
+      { label: 'Conectividade', value: asset.ipAddress ? 'IP OK' : 'Local' },
+      { label: 'Status', value: asset.status === 'OPERATIONAL' ? 'Online' : 'Atenção' },
       { label: 'Uptime', value: '99.9%' },
     ];
   };
@@ -486,7 +513,7 @@ export const Assets: React.FC = () => {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {assets.map((asset) => {
-            const metrics = getCategoryMetrics(asset.category);
+            const metrics = getCategoryMetrics(asset);
             const fallbackDataURI = getFallbackDataURI(asset.code, asset.category, asset.name);
             const equipmentImg = getExactIsolatedEquipmentImage(asset.code, asset.category, asset.name, asset.imageUrl);
 
@@ -501,13 +528,20 @@ export const Assets: React.FC = () => {
                     <span className="text-[11px] font-mono font-bold text-[#00f2fe] bg-[#00f2fe]/10 border border-[#00f2fe]/20 px-2.5 py-0.5 rounded-lg shadow-[0_0_10px_rgba(0,242,254,0.15)]">
                       {asset.code}
                     </span>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1.5">
                       <button
                         onClick={() => handleOpenEditModal(asset)}
                         className="p-1 text-slate-400 hover:text-[#00f2fe] rounded-lg hover:bg-slate-800 transition-colors"
                         title="Editar Ativo"
                       >
                         <Edit3 className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteAsset(asset.id, asset.name)}
+                        className="p-1 text-slate-400 hover:text-rose-400 rounded-lg hover:bg-rose-500/10 transition-colors"
+                        title="Excluir Ativo"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
                       </button>
                       {getStatusBadge(asset.status)}
                     </div>
@@ -650,6 +684,12 @@ export const Assets: React.FC = () => {
                 <span className="text-slate-400">Endereço IP:</span>
                 <span className="text-[#00f2fe] font-mono font-bold">{selectedAsset.ipAddress}</span>
               </div>
+              {(selectedAsset.wifiBands || selectedAsset.category === 'Redes Sem Fio') && (
+                <div className="flex justify-between py-1 border-b border-slate-800 bg-amber-500/5 px-2 rounded-lg">
+                  <span className="text-amber-400 font-semibold">Frequência / Banda Wi-Fi:</span>
+                  <span className="text-amber-300 font-mono font-bold">{selectedAsset.wifiBands || '2.4GHz / 5GHz (Dual-Band)'}</span>
+                </div>
+              )}
               <div className="flex justify-between py-1 border-b border-slate-800">
                 <span className="text-slate-400">Localização / Sala:</span>
                 <span className="text-slate-200 font-semibold">{selectedAsset.locationName}</span>
@@ -660,19 +700,30 @@ export const Assets: React.FC = () => {
               </div>
             </div>
 
-            <div className="mt-6 flex justify-end gap-2">
+            <div className="mt-6 flex items-center justify-between gap-2">
               <button
-                onClick={() => handleOpenEditModal(selectedAsset)}
-                className="bg-slate-800 hover:bg-slate-700 text-cyan-400 text-xs font-semibold px-4 py-2 rounded-xl flex items-center gap-1.5"
+                onClick={() => {
+                  const target = selectedAsset;
+                  handleDeleteAsset(target.id, target.name);
+                }}
+                className="bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 text-xs font-semibold px-3 py-2 rounded-xl flex items-center gap-1.5 transition-all"
               >
-                <Edit3 className="w-3.5 h-3.5" /> Editar Ativo
+                <Trash2 className="w-3.5 h-3.5" /> Excluir
               </button>
-              <button
-                onClick={() => setSelectedAsset(null)}
-                className="bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold px-4 py-2 rounded-xl"
-              >
-                Fechar
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => handleOpenEditModal(selectedAsset)}
+                  className="bg-slate-800 hover:bg-slate-700 text-cyan-400 text-xs font-semibold px-4 py-2 rounded-xl flex items-center gap-1.5"
+                >
+                  <Edit3 className="w-3.5 h-3.5" /> Editar
+                </button>
+                <button
+                  onClick={() => setSelectedAsset(null)}
+                  className="bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold px-4 py-2 rounded-xl"
+                >
+                  Fechar
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -759,6 +810,22 @@ export const Assets: React.FC = () => {
                   </select>
                 </div>
               </div>
+
+              {assetForm.category === 'Redes Sem Fio' && (
+                <div className="bg-amber-500/10 border border-amber-500/20 p-3 rounded-2xl space-y-1">
+                  <label className="block text-xs font-bold text-amber-400">
+                    Frequência e Banda Wi-Fi
+                  </label>
+                  <input
+                    type="text"
+                    value={assetForm.wifiBands}
+                    onChange={(e) => setAssetForm({ ...assetForm, wifiBands: e.target.value })}
+                    placeholder="Ex: 2.4GHz / 5GHz (Dual-Band Wi-Fi 6)"
+                    className="w-full bg-[#050811] border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-amber-400"
+                  />
+                  <p className="text-[10px] text-amber-400/80">Informação transmitida pela telemetria do Access Point</p>
+                </div>
+              )}
 
               <div className="grid grid-cols-2 gap-2">
                 <div>

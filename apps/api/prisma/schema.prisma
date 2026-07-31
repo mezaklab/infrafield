@@ -21,6 +21,18 @@ enum AssetStatus {
   CRITICAL
 }
 
+enum PeripheralCategory {
+  COMPUTADOR
+  IMPRESSORA
+  SCANNER
+  MONITOR
+}
+
+enum PeripheralSubcategory {
+  DESKTOP
+  NOTEBOOK
+}
+
 enum VisitStatus {
   PLANEJADA
   EM_ANDAMENTO
@@ -80,11 +92,12 @@ model Company {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  users     User[]
-  locations Location[]
-  assets    Asset[]
-  visits    Visit[]
-  issues    Issue[]
+  users       User[]
+  locations   Location[]
+  assets      Asset[]
+  peripherals Peripheral[]
+  visits      Visit[]
+  issues      Issue[]
 
   @@map("companies")
 }
@@ -100,9 +113,10 @@ model Location {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  assets Asset[]
-  visits Visit[]
-  issues Issue[]
+  assets      Asset[]
+  peripherals Peripheral[]
+  visits      Visit[]
+  issues      Issue[]
 
   @@map("locations")
 }
@@ -119,6 +133,7 @@ model User {
   updatedAt DateTime @updatedAt
 
   assets         Asset[]
+  peripherals    Peripheral[]
   visits         Visit[]
   reportedIssues Issue[]
 
@@ -136,6 +151,7 @@ model Asset {
   category     String
   status       AssetStatus @default(OPERATIONAL)
   imageUrl     String?
+  wifiBands    String?     // Frequência e Banda Wi-Fi (Ex: '2.4GHz / 5GHz')
 
   locationId String?
   location   Location? @relation(fields: [locationId], references: [id], onDelete: SetNull)
@@ -297,4 +313,35 @@ model Notification {
 
   @@map("notifications")
 }
+
+model Peripheral {
+  id             String                 @id @default(uuid())
+  name           String
+  code           String                 @unique
+  assetTag       String?                // Patrimônio
+  serialNumber   String?
+  category       PeripheralCategory     @default(COMPUTADOR)
+  subcategory    PeripheralSubcategory? // DESKTOP ou NOTEBOOK (quando category == COMPUTADOR)
+  brand          String?
+  model          String?
+  ipAddress      String?                // Endereço IP para monitoramento via Poller (ICMP Ping)
+  specifications String?                // Especificações técnicas / Observações
+  status         AssetStatus            @default(OPERATIONAL)
+  imageUrl       String?
+
+  locationId String?
+  location   Location? @relation(fields: [locationId], references: [id], onDelete: SetNull)
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  assignedToId String?
+  assignedTo   User?   @relation(fields: [assignedToId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("peripherals")
+}
+
 

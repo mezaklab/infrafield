@@ -5,6 +5,7 @@ import { Dashboard } from './pages/Dashboard';
 import { Assets } from './pages/Assets';
 import { Visits } from './pages/Visits';
 import { Issues } from './pages/Issues';
+import { Peripherals } from './pages/Peripherals';
 import { TabType } from './types';
 import { QRScannerModal } from './components/Camera/QRScannerModal';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
@@ -33,10 +34,11 @@ const AppInner: React.FC = () => {
       onOpenScanner={() => setIsGlobalScannerOpen(true)}
     >
       <div key={refreshKey}>
-        {activeTab === 'dashboard' && <Dashboard onNavigate={(tab) => setActiveTab(tab)} />}
-        {activeTab === 'assets'    && <Assets />}
-        {activeTab === 'visits'    && <Visits />}
-        {activeTab === 'issues'    && <Issues />}
+        {activeTab === 'dashboard'   && <Dashboard onNavigate={(tab) => setActiveTab(tab)} />}
+        {activeTab === 'assets'      && <Assets />}
+        {activeTab === 'visits'      && <Visits />}
+        {activeTab === 'issues'      && <Issues />}
+        {activeTab === 'peripherals' && <Peripherals />}
       </div>
 
       {/* Global QR Code / Camera Scanner Modal */}

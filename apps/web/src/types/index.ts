@@ -1,4 +1,4 @@
-export type TabType = 'dashboard' | 'assets' | 'visits' | 'issues';
+export type TabType = 'dashboard' | 'assets' | 'visits' | 'issues' | 'peripherals';
 
 export interface HealthStatus {
   status: string;
@@ -17,6 +17,47 @@ export interface Location {
   room?: string;
 }
 
+export type PeripheralCategory = 'COMPUTADOR' | 'IMPRESSORA' | 'SCANNER' | 'MONITOR';
+export type PeripheralSubcategory = 'DESKTOP' | 'NOTEBOOK';
+
+export interface Peripheral {
+  id: string;
+  code: string;
+  name: string;
+  assetTag?: string;
+  serialNumber?: string;
+  category: PeripheralCategory;
+  subcategory?: PeripheralSubcategory;
+  brand?: string;
+  model?: string;
+  ipAddress?: string;
+  specifications?: string;
+  status: 'OPERATIONAL' | 'MAINTENANCE' | 'CRITICAL' | 'INACTIVE';
+  imageUrl?: string;
+  locationId?: string;
+  locationName?: string;
+  locationDetails?: string;
+  assignedTo?: string;
+  assignedToEmail?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface PeripheralStats {
+  total: number;
+  operational: number;
+  byCategory: {
+    COMPUTADOR: number;
+    IMPRESSORA: number;
+    SCANNER: number;
+    MONITOR: number;
+  };
+  bySubcategory: {
+    DESKTOP: number;
+    NOTEBOOK: number;
+  };
+}
+
 export interface Asset {
   id: string;
   code: string;
@@ -30,6 +71,7 @@ export interface Asset {
   locationName?: string;
   status: 'OPERATIONAL' | 'MAINTENANCE' | 'CRITICAL' | 'INACTIVE';
   imageUrl?: string;
+  wifiBands?: string;
   lastInspection?: string;
   assignedTo?: string;
 }

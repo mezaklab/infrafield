@@ -2,6 +2,8 @@ import {
   PrismaClient, 
   Role, 
   AssetStatus, 
+  PeripheralCategory,
+  PeripheralSubcategory,
   VisitStatus, 
   VisitAssetStatus, 
   VisitPriority, 
@@ -32,6 +34,7 @@ async function main() {
   await prisma.visitAsset.deleteMany();
   await prisma.visit.deleteMany();
   await prisma.asset.deleteMany();
+  await prisma.peripheral.deleteMany();
   await prisma.location.deleteMany();
   await prisma.user.deleteMany();
   await prisma.company.deleteMany();
@@ -183,6 +186,7 @@ async function main() {
       hostname: 'ap-wifi-01.techcorp.local',
       ipAddress: '192.168.1.100',
       category: 'Redes Sem Fio',
+      wifiBands: '2.4GHz / 5GHz (Wi-Fi 6 Dual-Band)',
       status: AssetStatus.OPERATIONAL,
       locationId: location2.id,
       companyId: company.id,
@@ -190,6 +194,88 @@ async function main() {
     },
   });
   console.log('✅ 5 Assets created.');
+
+  // 4.5 Create Peripherals / Ativos de Informática
+  await prisma.peripheral.createMany({
+    data: [
+      {
+        code: 'PC-ADM-001',
+        name: 'Workstation Dell OptiPlex 7090 Tower',
+        assetTag: 'PER-00201',
+        serialNumber: 'SN-OPT7090-001',
+        category: PeripheralCategory.COMPUTADOR,
+        subcategory: PeripheralSubcategory.DESKTOP,
+        brand: 'Dell',
+        model: 'OptiPlex 7090',
+        ipAddress: '127.0.0.1', // Responde ao ping local
+        specifications: 'Intel Core i7 12ª Gen, 32GB RAM DDR5, SSD 1TB NVMe, Windows 11 Pro',
+        status: AssetStatus.OPERATIONAL,
+        locationId: location2.id,
+        companyId: company.id,
+        assignedToId: manager.id,
+      },
+      {
+        code: 'NTB-TI-002',
+        name: 'Notebook Lenovo ThinkPad X1 Carbon Gen 11',
+        assetTag: 'PER-00202',
+        serialNumber: 'SN-TPX1C-8812',
+        category: PeripheralCategory.COMPUTADOR,
+        subcategory: PeripheralSubcategory.NOTEBOOK,
+        brand: 'Lenovo',
+        model: 'ThinkPad X1 Carbon',
+        ipAddress: '192.168.1.15',
+        specifications: 'Intel Core i7, 32GB RAM, 1TB SSD, 14" OLED 4K, 4G LTE',
+        status: AssetStatus.OPERATIONAL,
+        locationId: location2.id,
+        companyId: company.id,
+        assignedToId: tech.id,
+      },
+      {
+        code: 'IMP-CORP-003',
+        name: 'Impressora Multifuncional HP LaserJet Enterprise M528dn',
+        assetTag: 'PER-00203',
+        serialNumber: 'SN-HPM528-9921',
+        category: PeripheralCategory.IMPRESSORA,
+        brand: 'HP',
+        model: 'LaserJet M528dn',
+        ipAddress: '192.168.1.16',
+        specifications: 'Monocromática, 45 ppm, Duplex Automático, Conexão Gigabit Ethernet',
+        status: AssetStatus.OPERATIONAL,
+        locationId: location2.id,
+        companyId: company.id,
+      },
+      {
+        code: 'SCN-DOC-004',
+        name: 'Scanner de Documentos Fujitsu fi-8170',
+        assetTag: 'PER-00204',
+        serialNumber: 'SN-FI8170-4412',
+        category: PeripheralCategory.SCANNER,
+        brand: 'Fujitsu',
+        model: 'fi-8170',
+        ipAddress: '192.168.1.17',
+        specifications: '70 ppm / 140 ipm, ADF 100 folhas, OCR embutido, Duplex',
+        status: AssetStatus.MAINTENANCE,
+        locationId: location2.id,
+        companyId: company.id,
+      },
+      {
+        code: 'MON-NOC-005',
+        name: 'Monitor Profissional Dell UltraSharp 27" 4K USB-C U2723QE',
+        assetTag: 'PER-00205',
+        serialNumber: 'SN-DELU2723-119',
+        category: PeripheralCategory.MONITOR,
+        brand: 'Dell',
+        model: 'UltraSharp U2723QE',
+        ipAddress: '192.168.1.18',
+        specifications: '27" IPS Black, 4K UHD 3840x2160, Hub USB-C 90W PD, RJ45 Ethernet',
+        status: AssetStatus.OPERATIONAL,
+        locationId: location1.id,
+        companyId: company.id,
+        assignedToId: admin.id,
+      },
+    ],
+  });
+  console.log('✅ 5 Peripherals created.');
 
   // 5. Create Visits
   const visit1 = await prisma.visit.create({

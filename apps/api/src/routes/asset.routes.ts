@@ -20,6 +20,7 @@ const CreateAssetSchema = z.object({
   companyId: z.string().optional(),
   assignedToId: z.string().optional(),
   imageUrl: z.string().optional(),
+  wifiBands: z.string().optional().nullable(),
 });
 
 const UpdateAssetSchema = CreateAssetSchema.partial();
@@ -143,6 +144,7 @@ assetRouter.post('/', async (req: Request, res: Response) => {
         companyId,
         assignedToId: parsed.data.assignedToId,
         imageUrl,
+        wifiBands: parsed.data.wifiBands,
       },
       include: {
         location: { select: { id: true, name: true } },

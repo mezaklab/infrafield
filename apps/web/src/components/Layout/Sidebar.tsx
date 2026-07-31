@@ -1,5 +1,5 @@
 import React from 'react';
-import { LayoutDashboard, Box, MapPin, AlertTriangle, LogOut, Server } from 'lucide-react';
+import { LayoutDashboard, Box, MapPin, AlertTriangle, LogOut, Server, Layers } from 'lucide-react';
 import { TabType } from '../../types';
 
 interface SidebarProps {
@@ -14,6 +14,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, onLog
     { id: 'assets' as TabType, label: 'Ativos TI & Redes', icon: Box },
     { id: 'visits' as TabType, label: 'Visitas & Vistorias', icon: MapPin },
     { id: 'issues' as TabType, label: 'Não Conformidades', icon: AlertTriangle },
+    { id: 'peripherals' as TabType, label: 'Periféricos', icon: Layers },
   ];
 
   return (
@@ -49,8 +50,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, onLog
                   : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
               }`}
             >
-              <Icon className={`w-5 h-5 transition-transform ${isActive ? 'scale-110 text-cyan-400' : ''}`} />
-              <span>{item.label}</span>
+              <Icon className={`w-5 h-5 shrink-0 transition-transform ${isActive ? 'scale-110 text-cyan-400' : ''}`} />
+              <span className="truncate whitespace-nowrap">{item.label}</span>
             </button>
           );
         })}

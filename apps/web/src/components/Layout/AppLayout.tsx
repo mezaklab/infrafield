@@ -31,6 +31,8 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
         return 'Visitas Técnicas de Campo';
       case 'issues':
         return 'Gestão de Não Conformidades';
+      case 'peripherals':
+        return 'Gestão de Informática & Periféricos';
       default:
         return 'InfraField';
     }

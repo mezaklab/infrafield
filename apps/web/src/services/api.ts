@@ -2,6 +2,9 @@ import axios from 'axios';
 import { 
   HealthStatus, 
   Asset, 
+  Peripheral,
+  PeripheralCategory,
+  PeripheralStats,
   Visit, 
   Location, 
   VisitAssetStatus, 
@@ -81,6 +84,7 @@ export const getAssets = async (filters?: { status?: string; category?: string; 
     locationName: item.location ? item.location.name : 'Não especificado',
     status: item.status,
     imageUrl: item.imageUrl || item.photoUrl,
+    wifiBands: item.wifiBands || undefined,
     lastInspection: item.updatedAt ? new Date(item.updatedAt).toISOString().split('T')[0] : 'N/A',
     assignedTo: item.assignedTo ? item.assignedTo.name : 'Não atribuído',
   }));
@@ -97,6 +101,7 @@ export const createAsset = async (data: {
   locationId?: string;
   status?: string;
   imageUrl?: string;
+  wifiBands?: string;
 }): Promise<any> => {
   const response = await api.post('/assets', data);
   return response.data;
@@ -113,9 +118,14 @@ export const updateAsset = async (id: string, data: Partial<{
   locationId: string;
   status: string;
   imageUrl: string;
+  wifiBands: string;
 }>): Promise<any> => {
   const response = await api.patch(`/assets/${id}`, data);
   return response.data;
+};
+
+export const deleteAsset = async (id: string): Promise<void> => {
+  await api.delete(`/assets/${id}`);
 };
 
 export const searchAssetImages = async (query: string): Promise<Array<{ title: string; url: string; thumbnailUrl?: string; source: string }>> => {
@@ -316,5 +326,91 @@ export const getNotifications = async (): Promise<NotificationItem[]> => {
 export const markNotificationsAsRead = async (): Promise<NotificationItem[]> => {
   const response = await api.patch('/notifications/mark-as-read');
   return response.data.notifications || response.data;
+};
+
+/* --- PERIPHERAL / IT ASSETS APIS --- */
+
+export const getPeripherals = async (filters?: {
+  status?: string;
+  category?: string;
+  subcategory?: string;
+  locationId?: string;
+  search?: string;
+}): Promise<Peripheral[]> => {
+  const response = await api.get<any[]>('/peripherals', { params: filters });
+  return response.data.map((item) => ({
+    id: item.id,
+    code: item.code,
+    name: item.name,
+    assetTag: item.assetTag || 'N/A',
+    serialNumber: item.serialNumber || 'N/A',
+    category: item.category as PeripheralCategory,
+    subcategory: item.subcategory as any,
+    brand: item.brand || 'N/A',
+    model: item.model || 'N/A',
+    ipAddress: item.ipAddress || 'N/A',
+    specifications: item.specifications || 'N/A',
+    status: item.status,
+    imageUrl: item.imageUrl,
+    locationId: item.locationId,
+    locationName: item.location ? item.location.name : 'Não alocado',
+    locationDetails: item.location ? [item.location.building, item.location.room].filter(Boolean).join(' - ') : '',
+    assignedTo: item.assignedTo ? item.assignedTo.name : 'Não atribuído',
+    assignedToEmail: item.assignedTo ? item.assignedTo.email : undefined,
+    createdAt: item.createdAt,
+    updatedAt: item.updatedAt,
+  }));
+};
+
+export const getPeripheralStats = async (): Promise<PeripheralStats> => {
+  const response = await api.get<PeripheralStats>('/peripherals/stats');
+  return response.data;
+};
+
+export const createPeripheral = async (data: {
+  name: string;
+  code: string;
+  assetTag?: string;
+  serialNumber?: string;
+  category: PeripheralCategory;
+  subcategory?: string;
+  brand?: string;
+  model?: string;
+  ipAddress?: string;
+  specifications?: string;
+  status?: string;
+  locationId?: string;
+  assignedToId?: string;
+  imageUrl?: string;
+}): Promise<Peripheral> => {
+  const response = await api.post('/peripherals', data);
+  return response.data;
+};
+
+export const updatePeripheral = async (
+  id: string,
+  data: Partial<{
+    name: string;
+    code: string;
+    assetTag: string;
+    serialNumber: string;
+    category: PeripheralCategory;
+    subcategory: string;
+    brand: string;
+    model: string;
+    ipAddress: string;
+    specifications: string;
+    status: string;
+    locationId: string;
+    assignedToId: string;
+    imageUrl: string;
+  }>
+): Promise<Peripheral> => {
+  const response = await api.patch(`/peripherals/${id}`, data);
+  return response.data;
+};
+
+export const deletePeripheral = async (id: string): Promise<void> => {
+  await api.delete(`/peripherals/${id}`);
 };
 

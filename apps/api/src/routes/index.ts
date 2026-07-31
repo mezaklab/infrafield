@@ -12,6 +12,7 @@ import { checklistRouter } from './checklist.routes';
 import { issueRouter } from './issue.routes';
 import { reportRouter } from './report.routes';
 import { notificationRouter } from './notification.routes';
+import { peripheralRouter } from './peripheral.routes';
 import { requireAuth } from '../middlewares/auth.middleware';
 
 export const routes = Router();
@@ -24,6 +25,8 @@ routes.use('/api/auth', authRouter);
 routes.use('/api/companies', requireAuth, companyRouter);
 routes.use('/api/locations', requireAuth, locationRouter);
 routes.use('/api/assets', requireAuth, assetRouter);
+routes.use('/api/peripherals', requireAuth, peripheralRouter);
+routes.use('/api/visits', requireAuth, visitRouter);
 routes.use('/api/visits', requireAuth, visitRouter);
 routes.use('/api/stats', requireAuth, statsRouter);
 routes.use('/api/upload', requireAuth, uploadRouter);
