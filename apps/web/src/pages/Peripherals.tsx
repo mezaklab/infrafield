@@ -25,6 +25,7 @@ import {
   Activity
 } from 'lucide-react';
 import { Peripheral, PeripheralCategory, PeripheralSubcategory, Location } from '../types';
+import { useAuth } from '../contexts/AuthContext';
 import {
   getPeripherals,
   getLocations,
@@ -35,6 +36,8 @@ import {
 import { getSocket, StatusUpdatedPayload } from '../services/socket';
 
 export const Peripherals: React.FC = () => {
+  const { isAdmin } = useAuth();
+
   const [peripherals, setPeripherals] = useState<Peripheral[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -108,12 +111,29 @@ export const Peripherals: React.FC = () => {
     };
   }, [loadData]);
 
+  // Auto re-fetch peripherals when tab receives focus, storage updates, or onboarding succeeds
+  useEffect(() => {
+    const handleReFetch = () => {
+      loadData();
+    };
+
+    window.addEventListener('focus', handleReFetch);
+    window.addEventListener('storage', handleReFetch);
+    window.addEventListener('infrafield:assetOnboarded', handleReFetch);
+
+    return () => {
+      window.removeEventListener('focus', handleReFetch);
+      window.removeEventListener('storage', handleReFetch);
+      window.removeEventListener('infrafield:assetOnboarded', handleReFetch);
+    };
+  }, [loadData]);
+
   const handleOpenCreateModal = () => {
     setEditingItem(null);
     setFormData({
       name: '',
       code: `PER-${Math.floor(1000 + Math.random() * 9000)}`,
-      assetTag: `PAT-${Math.floor(10000 + Math.random() * 90000)}`,
+      assetTag: '',
       serialNumber: '',
       category: 'COMPUTADOR',
       subcategory: 'DESKTOP',
@@ -578,13 +598,15 @@ export const Peripherals: React.FC = () => {
                             <Edit2 className="w-3.5 h-3.5" />
                           </button>
 
-                          <button
-                            onClick={() => handleDelete(item.id, item.name)}
-                            className="p-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 rounded-xl border border-rose-500/20 transition-all cursor-pointer"
-                            title="Excluir Equipamento"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
+                          {isAdmin && (
+                            <button
+                              onClick={() => handleDelete(item.id, item.name)}
+                              className="p-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 rounded-xl border border-rose-500/20 transition-all cursor-pointer"
+                              title="Excluir Equipamento"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>

@@ -18,15 +18,16 @@ const prisma = new PrismaClient();
 
 async function main() {
   console.log('🌱 Starting InfraField v0.4 Database Seeding...');
-
   const HASH_ROUNDS = 10;
+  const superadminPasswordHash = await bcrypt.hash('191003', HASH_ROUNDS);
   const adminPasswordHash = await bcrypt.hash('admin123', HASH_ROUNDS);
   const techPasswordHash = await bcrypt.hash('tecnico123', HASH_ROUNDS);
   const managerPasswordHash = await bcrypt.hash('gestor123', HASH_ROUNDS);
   const viewerPasswordHash = await bcrypt.hash('viewer123', HASH_ROUNDS);
 
-
   // Clean existing tables in reverse order of foreign keys
+  await prisma.auditLog.deleteMany().catch(() => {});
+  await prisma.systemSetting.deleteMany().catch(() => {});
   await prisma.issue.deleteMany();
   await prisma.checklistResponse.deleteMany();
   await prisma.checklistItem.deleteMany();
@@ -71,12 +72,34 @@ async function main() {
   console.log('✅ 2 Locations created:', [location1.name, location2.name].join(', '));
 
   // 3. Create Users
+  const superadmin = await prisma.user.create({
+    data: {
+      name: 'SuperAdmin Geral',
+      email: 'superadmin@infrafield.local',
+      password: superadminPasswordHash,
+      role: Role.SUPERADMIN,
+      companyId: company.id,
+    },
+  });
+
   const admin = await prisma.user.create({
     data: {
       name: 'Administrador InfraField',
       email: 'admin@infrafield.io',
       password: adminPasswordHash,
       role: Role.ADMIN,
+      companyId: company.id,
+    },
+  });
+
+  const techSimplePasswordHash = await bcrypt.hash('123', HASH_ROUNDS);
+
+  const techDev = await prisma.user.create({
+    data: {
+      name: 'Técnico de Campo (Dev)',
+      email: 'tecnico@infrafield.local',
+      password: techSimplePasswordHash,
+      role: Role.TECHNICIAN,
       companyId: company.id,
     },
   });

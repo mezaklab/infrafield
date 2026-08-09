@@ -17,7 +17,7 @@ import {
   NotificationItem
 } from '../types';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3333/api';
+const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
 
 export const api = axios.create({
   baseURL: API_BASE_URL,
@@ -55,7 +55,7 @@ export interface DashboardStats {
 }
 
 export const getHealth = async (): Promise<HealthStatus> => {
-  const response = await axios.get<HealthStatus>('http://localhost:3333/api/health', { timeout: 4000 });
+  const response = await api.get<HealthStatus>('/health', { timeout: 4000 });
   return response.data;
 };
 
@@ -67,6 +67,28 @@ export const getDashboardStats = async (): Promise<DashboardStats> => {
 export const getLocations = async (): Promise<Location[]> => {
   const response = await api.get<Location[]>('/locations');
   return response.data;
+};
+
+export const createLocation = async (data: {
+  name: string;
+  building?: string;
+  floor?: string;
+  room?: string;
+}): Promise<Location> => {
+  const response = await api.post('/locations', data);
+  return response.data;
+};
+
+export const updateLocation = async (
+  id: string,
+  data: Partial<{ name: string; building: string; floor: string; room: string }>
+): Promise<Location> => {
+  const response = await api.patch(`/locations/${id}`, data);
+  return response.data;
+};
+
+export const deleteLocation = async (id: string): Promise<void> => {
+  await api.delete(`/locations/${id}`);
 };
 
 export const getAssets = async (filters?: { status?: string; category?: string; locationId?: string; search?: string }): Promise<Asset[]> => {

@@ -11,6 +11,7 @@ interface AppLayoutProps {
   onLogout: () => void;
   onRefresh?: () => void;
   onOpenScanner?: () => void;
+  onNavigateToAdmin?: () => void;
 }
 
 export const AppLayout: React.FC<AppLayoutProps> = ({
@@ -20,6 +21,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
   onLogout,
   onRefresh,
   onOpenScanner,
+  onNavigateToAdmin,
 }) => {
   const getTitle = () => {
     switch (activeTab) {
@@ -33,6 +35,8 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
         return 'Gestão de Não Conformidades';
       case 'peripherals':
         return 'Gestão de Informática & Periféricos';
+      case 'onboarding':
+        return 'Onboarding Automático de Equipamentos';
       default:
         return 'InfraField';
     }
@@ -41,7 +45,12 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
   return (
     <div className="flex min-h-screen bg-slate-950 text-slate-100">
       {/* Sidebar for Desktop */}
-      <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} onLogout={onLogout} />
+      <Sidebar 
+        activeTab={activeTab} 
+        setActiveTab={setActiveTab} 
+        onLogout={onLogout} 
+        onNavigateToAdmin={onNavigateToAdmin} 
+      />
 
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col min-w-0 pb-20 md:pb-0">

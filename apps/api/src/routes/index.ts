@@ -13,27 +13,36 @@ import { issueRouter } from './issue.routes';
 import { reportRouter } from './report.routes';
 import { notificationRouter } from './notification.routes';
 import { peripheralRouter } from './peripheral.routes';
-import { requireAuth } from '../middlewares/auth.middleware';
+import { adminRouter } from './admin.routes';
+import { requireAuth, requireRole } from '../middlewares/auth.middleware';
+import { Role } from '@prisma/client';
 
 export const routes = Router();
 
-// Public routes
+// ─── Public Routes ───────────────────────────────────────────────────────────
 routes.use('/api', healthRouter);
 routes.use('/api/auth', authRouter);
 
-// Protected routes — require valid JWT
-routes.use('/api/companies', requireAuth, companyRouter);
-routes.use('/api/locations', requireAuth, locationRouter);
-routes.use('/api/assets', requireAuth, assetRouter);
-routes.use('/api/peripherals', requireAuth, peripheralRouter);
-routes.use('/api/visits', requireAuth, visitRouter);
-routes.use('/api/visits', requireAuth, visitRouter);
-routes.use('/api/stats', requireAuth, statsRouter);
-routes.use('/api/upload', requireAuth, uploadRouter);
-routes.use('/api/sync', requireAuth, syncRouter);
-routes.use('/api/checklists', requireAuth, checklistRouter);
-routes.use('/api/issues', requireAuth, issueRouter);
-routes.use('/api/reports', requireAuth, reportRouter);
+// /api/assets/onboard is intentionally public for PowerShell script ingestion.
+// It has its own audit log. All other /api/assets/* require auth.
+routes.post('/api/assets/onboard', assetRouter);
+
+// Locations GET is public so the /onboard page (unauthenticated) can load sectors.
+// Write operations (POST/PATCH/DELETE) require auth — enforced inside locationRouter.
+routes.use('/api/locations', locationRouter);
+
+// ─── Protected Routes — require valid JWT ─────────────────────────────────────
+routes.use('/api/companies',    requireAuth, companyRouter);
+routes.use('/api/assets',       requireAuth, assetRouter);
+routes.use('/api/peripherals',  requireAuth, peripheralRouter);
+routes.use('/api/visits',       requireAuth, visitRouter);
+routes.use('/api/stats',        requireAuth, statsRouter);
+routes.use('/api/upload',       requireAuth, uploadRouter);
+routes.use('/api/sync',         requireAuth, syncRouter);
+routes.use('/api/checklists',   requireAuth, checklistRouter);
+routes.use('/api/issues',       requireAuth, issueRouter);
+routes.use('/api/reports',      requireAuth, reportRouter);
 routes.use('/api/notifications', requireAuth, notificationRouter);
 
-
+// ─── Admin Backoffice — SUPERADMIN & ADMIN only ───────────────────────────────
+routes.use('/api/admin', requireAuth, requireRole([Role.SUPERADMIN, Role.ADMIN]), adminRouter);

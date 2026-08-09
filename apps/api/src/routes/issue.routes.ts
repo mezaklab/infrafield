@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma';
-import { IssueSeverity, IssueStatus } from '@prisma/client';
+import { IssueSeverity, IssueStatus, Prisma } from '@prisma/client';
 
 export const issueRouter = Router();
 
@@ -30,7 +30,7 @@ issueRouter.get('/', async (req: Request, res: Response) => {
   try {
     const { status, severity, visitId, assetId, search } = req.query;
 
-    const where: any = {};
+    const where: Prisma.IssueWhereInput = {};
 
     if (status && status !== 'ALL') {
       where.status = status as IssueStatus;

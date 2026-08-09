@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../lib/prisma';
-import { AssetStatus, VisitStatus, IssueSeverity } from '@prisma/client';
+import { AssetStatus, VisitStatus, IssueSeverity, Prisma } from '@prisma/client';
 
 export const statsRouter = Router();
 
@@ -42,9 +42,8 @@ statsRouter.get('/dashboard', async (_req: Request, res: Response) => {
           visitAssets: { include: { asset: { select: { id: true, code: true, name: true } } } },
         },
       }),
-      prisma.user.findMany({
-        select: { id: true, name: true, email: true, role: true },
-      }),
+      // Return only technician count, not full list with emails
+      prisma.user.count({ where: { role: { in: ['TECHNICIAN', 'MANAGER', 'ADMIN', 'SUPERADMIN'] } } }),
       prisma.issue.count({ where: { severity: IssueSeverity.CRITICAL } }),
       prisma.issue.count({ where: { severity: IssueSeverity.HIGH } }),
       prisma.issue.count({ where: { severity: IssueSeverity.MEDIUM } }),
@@ -89,7 +88,7 @@ statsRouter.get('/dashboard', async (_req: Request, res: Response) => {
         low: lowIssues,
       },
       recentVisits,
-      technicians,
+      technicianCount: technicians,
     });
   } catch (error: any) {
     console.error('Error calculating stats:', error);

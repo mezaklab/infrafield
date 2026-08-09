@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma';
-import { AssetStatus, PeripheralCategory, PeripheralSubcategory } from '@prisma/client';
+import { AssetStatus, PeripheralCategory, PeripheralSubcategory, Prisma } from '@prisma/client';
 import { emitAssetStatusUpdate } from '../services/websocket.service';
 
 export const peripheralRouter = Router();
@@ -74,7 +74,7 @@ peripheralRouter.get('/', async (req: Request, res: Response) => {
   try {
     const { status, category, subcategory, locationId, search } = req.query;
 
-    const where: any = {};
+    const where: Prisma.PeripheralWhereInput = {};
 
     if (status && status !== 'ALL') {
       where.status = status as AssetStatus;
@@ -210,7 +210,7 @@ peripheralRouter.patch('/:id', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Dados inválidos', details: parsed.error.format() });
     }
 
-    const updateData: any = { ...parsed.data };
+    const updateData: Prisma.PeripheralUpdateInput = { ...parsed.data };
     if (updateData.category && updateData.category !== PeripheralCategory.COMPUTADOR) {
       updateData.subcategory = null;
     }

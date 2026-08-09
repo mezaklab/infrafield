@@ -29,8 +29,8 @@ export const Login: React.FC = () => {
   };
 
   const fillDemo = (role: 'admin' | 'tech') => {
-    if (role === 'admin') { setEmail('admin@infrafield.io'); setPassword('admin123'); }
-    else                  { setEmail('carlos.silva@infrafield.io'); setPassword('tecnico123'); }
+    if (role === 'admin') { setEmail('superadmin@infrafield.local'); setPassword('191003'); }
+    else                  { setEmail('tecnico@infrafield.local'); setPassword('123'); }
     setError(null);
   };
 

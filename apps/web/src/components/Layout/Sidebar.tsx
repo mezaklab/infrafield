@@ -1,20 +1,26 @@
 import React from 'react';
-import { LayoutDashboard, Box, MapPin, AlertTriangle, LogOut, Server, Layers } from 'lucide-react';
+import { LayoutDashboard, Box, MapPin, AlertTriangle, LogOut, Server, Layers, ShieldCheck, ArrowRight, Sparkles } from 'lucide-react';
 import { TabType } from '../../types';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface SidebarProps {
   activeTab: TabType;
   setActiveTab: (tab: TabType) => void;
   onLogout: () => void;
+  onNavigateToAdmin?: () => void;
 }
 
-export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, onLogout }) => {
+export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, onLogout, onNavigateToAdmin }) => {
+  const { user, isSuperAdmin } = useAuth();
+  const hasAdminRole = user?.role === 'SUPERADMIN' || user?.role === 'ADMIN';
+
   const navItems = [
     { id: 'dashboard' as TabType, label: 'Dashboard', icon: LayoutDashboard },
     { id: 'assets' as TabType, label: 'Ativos TI & Redes', icon: Box },
     { id: 'visits' as TabType, label: 'Visitas & Vistorias', icon: MapPin },
     { id: 'issues' as TabType, label: 'Não Conformidades', icon: AlertTriangle },
     { id: 'peripherals' as TabType, label: 'Periféricos', icon: Layers },
+    { id: 'onboarding' as TabType, label: 'Onboarding PC', icon: Sparkles },
   ];
 
   return (
@@ -55,6 +61,22 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, onLog
             </button>
           );
         })}
+
+        {/* Dedicated Backoffice Button (Exibido APENAS para SUPERADMIN e ADMIN) */}
+        {hasAdminRole && onNavigateToAdmin && (
+          <div className="pt-3">
+            <button
+              onClick={onNavigateToAdmin}
+              className="w-full flex items-center justify-between px-3.5 py-3 rounded-xl font-bold text-xs bg-gradient-to-r from-purple-900/60 to-indigo-900/60 text-purple-300 border border-purple-500/40 hover:border-purple-400/60 transition-all shadow-md shadow-purple-950/40 group"
+            >
+              <div className="flex items-center gap-2.5">
+                <ShieldCheck className="w-4 h-4 text-purple-400 group-hover:rotate-12 transition-transform" />
+                <span>Gestão Central</span>
+              </div>
+              <ArrowRight className="w-3.5 h-3.5 text-purple-400 group-hover:translate-x-0.5 transition-transform" />
+            </button>
+          </div>
+        )}
       </nav>
 
       {/* System Status summary badge */}
@@ -68,13 +90,17 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, onLog
 
       {/* User Profile & Logout */}
       <div className="pt-4 border-t border-slate-800 flex items-center justify-between px-2">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-300 font-semibold text-sm">
-            TE
+        <div className="flex items-center gap-3 min-w-0">
+          <div className={`w-9 h-9 rounded-full border flex items-center justify-center font-semibold text-xs ${
+            isSuperAdmin 
+              ? 'bg-amber-500/20 text-amber-300 border-amber-500/40' 
+              : 'bg-slate-800 text-slate-300 border-slate-700'
+          }`}>
+            {user?.name?.slice(0, 2).toUpperCase() || 'US'}
           </div>
-          <div className="flex flex-col">
-            <span className="text-xs font-semibold text-slate-200">Carlos Silva</span>
-            <span className="text-[11px] text-slate-400">carlos.silva@infrafield.io</span>
+          <div className="flex flex-col min-w-0">
+            <span className="text-xs font-semibold text-slate-200 truncate">{user?.name || 'Usuário'}</span>
+            <span className="text-[11px] text-slate-400 truncate">{user?.email || 'email@infrafield.io'}</span>
           </div>
         </div>
         <button

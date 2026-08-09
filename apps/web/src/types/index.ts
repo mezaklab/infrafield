@@ -1,4 +1,57 @@
-export type TabType = 'dashboard' | 'assets' | 'visits' | 'issues' | 'peripherals';
+export type TabType = 'dashboard' | 'assets' | 'visits' | 'issues' | 'peripherals' | 'onboarding';
+export type AdminTabType = 'dashboard' | 'users' | 'audit-logs' | 'settings' | 'locations';
+
+export interface SystemUser {
+  id: string;
+  name: string;
+  email: string;
+  role: 'SUPERADMIN' | 'ADMIN' | 'MANAGER' | 'TECHNICIAN' | 'VIEWER';
+  companyId: string;
+  company?: { id: string; name: string };
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface AuditLogItem {
+  id: string;
+  action: string;
+  user: string;
+  role: string;
+  details?: string;
+  ipAddress?: string;
+  createdAt: string;
+}
+
+export interface SystemSettingsData {
+  maintenanceMode: string;
+  sessionTimeoutMinutes: string;
+  requireMfaForAdmins: string;
+  icmpPingIntervalSeconds: string;
+  alertEmailNotification: string;
+  maxLoginAttempts: string;
+  autoAuditLogRetentionDays: string;
+  [key: string]: string;
+}
+
+export interface AdminDashboardStats {
+  totalUsers: number;
+  totalAssets: number;
+  totalPeripherals: number;
+  totalVisits: number;
+  totalIssues: number;
+  auditLogsCount: number;
+  usersByRole: {
+    SUPERADMIN: number;
+    ADMIN: number;
+    MANAGER: number;
+    TECHNICIAN: number;
+    VIEWER: number;
+  };
+  systemHealth: string;
+  serverUptimeSeconds: number;
+  environment: string;
+  dbConnection: string;
+}
 
 export interface HealthStatus {
   status: string;

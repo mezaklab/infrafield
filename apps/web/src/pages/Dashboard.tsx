@@ -17,10 +17,24 @@ import {
   FileText,
   Building,
   X,
-  ArrowRight
+  ArrowRight,
+  Plus,
+  Edit2,
+  Trash2
 } from 'lucide-react';
 import { HealthStatus, TabType, Location } from '../types';
-import { getHealth, getDashboardStats, DashboardStats, getLocations, downloadInventoryPDFReport, exportAssetsCSV } from '../services/api';
+import { useAuth } from '../contexts/AuthContext';
+import { 
+  getHealth, 
+  getDashboardStats, 
+  DashboardStats, 
+  getLocations, 
+  createLocation, 
+  updateLocation, 
+  deleteLocation, 
+  downloadInventoryPDFReport, 
+  exportAssetsCSV 
+} from '../services/api';
 import { getSocket, StatusUpdatedPayload } from '../services/socket';
 import { TelemetryWaveform } from '../components/TelemetryWaveform';
 
@@ -29,6 +43,8 @@ interface DashboardProps {
 }
 
 export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
+  const { isAdmin } = useAuth();
+
   const [health, setHealth] = useState<HealthStatus | null>(null);
   const [loadingHealth, setLoadingHealth] = useState<boolean>(true);
   const [healthError, setHealthError] = useState<string | null>(null);
@@ -38,6 +54,76 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
   const [loadingStats, setLoadingStats] = useState<boolean>(true);
   const [locations, setLocations] = useState<Location[]>([]);
   const [isLocationsModalOpen, setIsLocationsModalOpen] = useState<boolean>(false);
+
+  // Location CRUD Modal States
+  const [isLocationFormOpen, setIsLocationFormOpen] = useState<boolean>(false);
+  const [editingLocation, setEditingLocation] = useState<Location | null>(null);
+  const [locName, setLocName] = useState<string>('');
+  const [locBuilding, setLocBuilding] = useState<string>('');
+  const [locRoom, setLocRoom] = useState<string>('');
+  const [isSavingLoc, setIsSavingLoc] = useState<boolean>(false);
+
+  const handleOpenCreateLocation = () => {
+    setEditingLocation(null);
+    setLocName('');
+    setLocBuilding('');
+    setLocRoom('');
+    setIsLocationFormOpen(true);
+  };
+
+  const handleOpenEditLocation = (loc: Location) => {
+    setEditingLocation(loc);
+    setLocName(loc.name);
+    setLocBuilding(loc.building || '');
+    setLocRoom(loc.room || '');
+    setIsLocationFormOpen(true);
+  };
+
+  const handleSaveLocation = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!locName.trim()) return;
+
+    try {
+      setIsSavingLoc(true);
+      if (editingLocation) {
+        await updateLocation(editingLocation.id, {
+          name: locName.trim(),
+          building: locBuilding.trim() || undefined,
+          room: locRoom.trim() || undefined,
+        });
+      } else {
+        await createLocation({
+          name: locName.trim(),
+          building: locBuilding.trim() || undefined,
+          room: locRoom.trim() || undefined,
+        });
+      }
+
+      const updatedLocs = await getLocations();
+      setLocations(updatedLocs || []);
+      setIsLocationFormOpen(false);
+      setEditingLocation(null);
+      setLocName('');
+      setLocBuilding('');
+      setLocRoom('');
+    } catch (err) {
+      alert('Erro ao salvar localidade.');
+    } finally {
+      setIsSavingLoc(false);
+    }
+  };
+
+  const handleDeleteLocation = async (id: string, name: string) => {
+    if (confirm(`Deseja realmente remover a localidade/setor "${name}"?`)) {
+      try {
+        await deleteLocation(id);
+        const updatedLocs = await getLocations();
+        setLocations(updatedLocs || []);
+      } catch (err) {
+        alert('Erro ao excluir localidade.');
+      }
+    }
+  };
 
   const loadData = useCallback(async () => {
     setLoadingHealth(true);
@@ -52,7 +138,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
     } catch (err: any) {
       console.warn('API Health Check Error:', err);
       setHealth(null);
-      setHealthError(err.message || 'Não foi possível conectar à API backend em http://localhost:3333/api/health');
+      setHealthError(err.message || 'Não foi possível conectar à API backend.');
       setLastCheckTime(new Date().toLocaleTimeString());
     } finally {
       setLoadingHealth(false);
@@ -91,6 +177,23 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
 
     return () => {
       socket.off('statusUpdated', handleStatusUpdated);
+    };
+  }, [loadData]);
+
+  // Re-fetch dashboard stats when tab receives focus, storage updates, or onboarding succeeds
+  useEffect(() => {
+    const handleReFetch = () => {
+      loadData();
+    };
+
+    window.addEventListener('focus', handleReFetch);
+    window.addEventListener('storage', handleReFetch);
+    window.addEventListener('infrafield:assetOnboarded', handleReFetch);
+
+    return () => {
+      window.removeEventListener('focus', handleReFetch);
+      window.removeEventListener('storage', handleReFetch);
+      window.removeEventListener('infrafield:assetOnboarded', handleReFetch);
     };
   }, [loadData]);
 
@@ -142,7 +245,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
               </div>
 
               <div className="mt-1.5 text-xs text-slate-400 flex flex-wrap items-center gap-y-1 gap-x-4">
-                <span>API Endpoint: <code className="text-[#00f2fe] font-mono">http://localhost:3333/api</code></span>
+                <span>API Endpoint: <code className="text-[#00f2fe] font-mono">/api</code></span>
                 <span>Status: {health ? <strong className="text-emerald-400 font-mono">CONECTADO (200 OK)</strong> : <strong className="text-rose-400 font-mono font-bold">DESCONECTADO (Porta 3333)</strong>}</span>
                 {health && (
                   <>
@@ -193,7 +296,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
               <div>
                 <strong className="text-rose-200 text-xs uppercase tracking-wider block font-bold">⚠️ Falha de Comunicação com a API Backend:</strong>
                 <p className="text-slate-300 text-[11px] mt-0.5">
-                  A API em <code className="text-[#00f2fe] font-mono">http://localhost:3333/api</code> não respondeu. Certifique-se de que o servidor Express Node.js está rodando. O painel está exibindo cache offline.
+                  A API em <code className="text-[#00f2fe] font-mono">/api</code> não respondeu. Certifique-se de que o servidor Express Node.js está rodando. O painel está exibindo cache offline.
                 </p>
               </div>
             </div>
@@ -454,17 +557,98 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
                   <Building className="w-6 h-6" />
                 </div>
                 <div>
-                  <h3 className="text-base font-extrabold text-white tracking-tight">Locais Mapeados & Cobertura do Parque</h3>
-                  <p className="text-xs text-slate-400">Infraestrutura predial e salas técnicas sob monitoramento NOC</p>
+                  <h3 className="text-base font-extrabold text-white tracking-tight">Gerenciamento de Localidades & Setores</h3>
+                  <p className="text-xs text-slate-400">Prédios, secretarias, salas e infraestrutura NOC</p>
                 </div>
               </div>
-              <button
-                onClick={() => setIsLocationsModalOpen(false)}
-                className="p-2 text-slate-400 hover:text-white bg-slate-900 hover:bg-slate-800 rounded-xl border border-slate-800 transition-all cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleOpenCreateLocation}
+                  className="px-3.5 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold text-xs rounded-xl flex items-center gap-1.5 transition-all cursor-pointer shadow-lg shadow-emerald-500/20"
+                >
+                  <Plus className="w-4 h-4 stroke-[3]" />
+                  <span>Novo Setor</span>
+                </button>
+                <button
+                  onClick={() => setIsLocationsModalOpen(false)}
+                  className="p-2 text-slate-400 hover:text-white bg-slate-900 hover:bg-slate-800 rounded-xl border border-slate-800 transition-all cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
             </div>
+
+            {/* Form Inline de Criar / Editar Setor */}
+            {isLocationFormOpen && (
+              <form onSubmit={handleSaveLocation} className="p-4 rounded-2xl bg-[#050811] border border-emerald-500/30 space-y-3 animate-fadeIn text-xs">
+                <div className="flex items-center justify-between">
+                  <h4 className="font-bold text-white text-xs">
+                    {editingLocation ? 'Editar Localidade / Setor' : 'Cadastrar Nova Localidade / Setor'}
+                  </h4>
+                  <button
+                    type="button"
+                    onClick={() => setIsLocationFormOpen(false)}
+                    className="text-slate-400 hover:text-white"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-slate-300 font-bold">Nome do Setor / Secretaria *</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="Ex: Sec. de Saúde - Almoxarifado"
+                      value={locName}
+                      onChange={(e) => setLocName(e.target.value)}
+                      className="w-full bg-[#080d1a] border border-slate-800 text-white rounded-xl px-3 py-2 outline-none focus:border-emerald-500"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-slate-300 font-bold">Prédio / Edifício</label>
+                    <input
+                      type="text"
+                      placeholder="Ex: Prédio Central"
+                      value={locBuilding}
+                      onChange={(e) => setLocBuilding(e.target.value)}
+                      className="w-full bg-[#080d1a] border border-slate-800 text-white rounded-xl px-3 py-2 outline-none focus:border-emerald-500"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-slate-300 font-bold">Sala / Anexo</label>
+                    <input
+                      type="text"
+                      placeholder="Ex: Sala 02 - Térreo"
+                      value={locRoom}
+                      onChange={(e) => setLocRoom(e.target.value)}
+                      className="w-full bg-[#080d1a] border border-slate-800 text-white rounded-xl px-3 py-2 outline-none focus:border-emerald-500"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-end gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => setIsLocationFormOpen(false)}
+                    className="px-3.5 py-1.5 bg-slate-800 text-slate-300 font-bold rounded-xl"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isSavingLoc}
+                    className="px-4 py-1.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold rounded-xl flex items-center gap-1 cursor-pointer"
+                  >
+                    {isSavingLoc ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
+                    <span>Salvar Setor</span>
+                  </button>
+                </div>
+              </form>
+            )}
 
             <div className="space-y-3 max-h-96 overflow-y-auto pr-1 custom-scrollbar">
               {locations.length > 0 ? (
@@ -481,19 +665,40 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
                         Prédio: <span className="text-slate-200 font-medium">{loc.building || 'Prédio Principal'}</span> • Sala: <span className="text-slate-200 font-medium">{loc.room || 'Telecom/Rack'}</span>
                       </p>
                     </div>
-                    <button
-                      onClick={() => {
-                        setIsLocationsModalOpen(false);
-                        onNavigate('assets');
-                      }}
-                      className="text-xs font-bold text-[#00f2fe] bg-[#00f2fe]/10 hover:bg-[#00f2fe]/20 border border-[#00f2fe]/30 px-3 py-1.5 rounded-xl flex items-center gap-1 transition-all cursor-pointer"
-                    >
-                      Ver Ativos <ArrowRight className="w-3.5 h-3.5" />
-                    </button>
+
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => handleOpenEditLocation(loc)}
+                        className="p-2 bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white rounded-xl border border-slate-800 transition-all cursor-pointer"
+                        title="Editar Setor"
+                      >
+                        <Edit2 className="w-3.5 h-3.5" />
+                      </button>
+
+                      {isAdmin && (
+                        <button
+                          onClick={() => handleDeleteLocation(loc.id, loc.name)}
+                          className="p-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 rounded-xl border border-rose-500/20 transition-all cursor-pointer"
+                          title="Excluir Setor"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+
+                      <button
+                        onClick={() => {
+                          setIsLocationsModalOpen(false);
+                          onNavigate('assets');
+                        }}
+                        className="text-xs font-bold text-[#00f2fe] bg-[#00f2fe]/10 hover:bg-[#00f2fe]/20 border border-[#00f2fe]/30 px-3 py-1.5 rounded-xl flex items-center gap-1 transition-all cursor-pointer"
+                      >
+                        Ver Ativos <ArrowRight className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                   </div>
                 ))
               ) : (
-                <div className="py-6 text-center text-xs text-slate-400">Carregando informações dos locais...</div>
+                <div className="py-6 text-center text-xs text-slate-400">Nenhuma localidade encontrada.</div>
               )}
             </div>
 

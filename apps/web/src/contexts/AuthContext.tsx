@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { api } from '../services/api';
 
-export type UserRole = 'ADMIN' | 'MANAGER' | 'TECHNICIAN' | 'VIEWER';
+export type UserRole = 'SUPERADMIN' | 'ADMIN' | 'MANAGER' | 'TECHNICIAN' | 'VIEWER';
 
 export interface AuthUser {
   id: string;
@@ -15,9 +15,11 @@ interface AuthContextValue {
   user: AuthUser | null;
   token: string | null;
   isAuthenticated: boolean;
-  isAdmin: boolean;       // ADMIN only
-  isManager: boolean;     // ADMIN or MANAGER
+  isSuperAdmin: boolean;  // SUPERADMIN only
+  isAdmin: boolean;       // SUPERADMIN or ADMIN
+  isManager: boolean;     // SUPERADMIN, ADMIN or MANAGER
   isTechnician: boolean;  // TECHNICIAN
+  canAccessAdmin: boolean;// SUPERADMIN or ADMIN
   login: (email: string, password: string) => Promise<void>;
   logout: () => void;
 }
@@ -63,12 +65,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const isAuthenticated = !!user && !!token;
-  const isAdmin    = user?.role === 'ADMIN';
-  const isManager  = user?.role === 'ADMIN' || user?.role === 'MANAGER';
+  const isSuperAdmin = user?.role === 'SUPERADMIN';
+  const isAdmin      = user?.role === 'SUPERADMIN' || user?.role === 'ADMIN';
+  const isManager    = user?.role === 'SUPERADMIN' || user?.role === 'ADMIN' || user?.role === 'MANAGER';
   const isTechnician = user?.role === 'TECHNICIAN';
+  const canAccessAdmin = isSuperAdmin || isAdmin;
 
   return (
-    <AuthContext.Provider value={{ user, token, isAuthenticated, isAdmin, isManager, isTechnician, login, logout }}>
+    <AuthContext.Provider value={{ user, token, isAuthenticated, isSuperAdmin, isAdmin, isManager, isTechnician, canAccessAdmin, login, logout }}>
       {children}
     </AuthContext.Provider>
   );

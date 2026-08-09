@@ -8,6 +8,7 @@ datasource db {
 }
 
 enum Role {
+  SUPERADMIN
   ADMIN
   MANAGER
   TECHNICIAN
@@ -342,6 +343,28 @@ model Peripheral {
   updatedAt DateTime @updatedAt
 
   @@map("peripherals")
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  action    String
+  user      String
+  role      String
+  details   String?
+  ipAddress String?
+  createdAt DateTime @default(now())
+
+  @@map("audit_logs")
+}
+
+model SystemSetting {
+  id        String   @id @default(uuid())
+  key       String   @unique
+  value     String
+  category  String   @default("GENERAL")
+  updatedAt DateTime @updatedAt
+
+  @@map("system_settings")
 }
 
 
