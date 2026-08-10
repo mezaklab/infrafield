@@ -1,13 +1,49 @@
 # =====================================================================
-# InfraField v0.4 - Script de Coleta Automática Avançada (Hardware WMI)
-# Captura Hostname, IP, CPU, RAM, OS, Marca e Modelo do Windows
+# InfraField v1.0 - Script de Coleta Automática Avançada (Hardware WMI)
+# Captura Hostname, IP, CPU, RAM, OS, Marca, Modelo e Flag de Locado
 # =====================================================================
+
+param (
+    [switch]$IsRented,
+    [switch]$Rented,
+    [string]$RentalCompany = "",
+    [string]$Company = "",
+    [string]$ServerHost = "localhost",
+    [string]$ServerPort = "5173"
+)
 
 $ErrorActionPreference = "Continue"
 
-# Servidor InfraField Web (Altere IP/Porta se necessário)
-$serverHost = "localhost"
-$serverPort = "5173"
+# 0. Leitura de arquivo .env no diretório do script (se existente)
+$scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Definition
+if (-not $scriptDir) { $scriptDir = $PSScriptRoot }
+$envFile = Join-Path -Path $scriptDir -ChildPath ".env"
+
+if (Test-Path $envFile) {
+    Get-Content $envFile | ForEach-Object {
+        $line = $_.Trim()
+        if ($line -and -not $line.StartsWith("#") -and $line.Contains("=")) {
+            $parts = $line.Split("=", 2)
+            $key = $parts[0].Trim()
+            $val = $parts[1].Trim().Trim('"').Trim("'")
+            if ($key -eq "IS_RENTED" -and ($val -eq "true" -or $val -eq "1")) {
+                $IsRented = $true
+            }
+            if ($key -eq "RENTAL_COMPANY" -and $val -and -not $RentalCompany) {
+                $RentalCompany = $val
+            }
+        }
+    }
+}
+
+# Consolidar flags de patrimônio locado
+$isRentedFinal = [bool]($IsRented -or $Rented)
+$rentalCompanyFinal = ""
+if ($RentalCompany) {
+    $rentalCompanyFinal = $RentalCompany
+} elseif ($Company) {
+    $rentalCompanyFinal = $Company
+}
 
 Write-Host "=====================================================" -ForegroundColor Cyan
 Write-Host "  INFRAFIELD - ONBOARDING AVANÇADO DE HARDWARE       " -ForegroundColor Yellow
@@ -69,16 +105,18 @@ try {
     }
 } catch {}
 
-# 4. Encodar parâmetros para a URL
-$encodedHost  = [System.Uri]::EscapeDataString($hostname)
-$encodedIp    = [System.Uri]::EscapeDataString($ip)
-$encodedCpu   = [System.Uri]::EscapeDataString($cpu)
-$encodedRam   = [System.Uri]::EscapeDataString($ram)
-$encodedOs    = [System.Uri]::EscapeDataString($os)
-$encodedBrand = [System.Uri]::EscapeDataString($brand)
-$encodedModel = [System.Uri]::EscapeDataString($model)
+# 4. Encodar parâmetros para a URL e Payload JSON
+$encodedHost          = [System.Uri]::EscapeDataString($hostname)
+$encodedIp            = [System.Uri]::EscapeDataString($ip)
+$encodedCpu           = [System.Uri]::EscapeDataString($cpu)
+$encodedRam           = [System.Uri]::EscapeDataString($ram)
+$encodedOs            = [System.Uri]::EscapeDataString($os)
+$encodedBrand         = [System.Uri]::EscapeDataString($brand)
+$encodedModel         = [System.Uri]::EscapeDataString($model)
+$encodedIsRented      = if ($isRentedFinal) { "true" } else { "false" }
+$encodedRentalCompany = [System.Uri]::EscapeDataString($rentalCompanyFinal)
 
-$targetUrl = "http://${serverHost}:${serverPort}/onboard?host=${encodedHost}&ip=${encodedIp}&cpu=${encodedCpu}&ram=${encodedRam}&os=${encodedOs}&brand=${encodedBrand}&model=${encodedModel}"
+$targetUrl = "http://${ServerHost}:${ServerPort}/onboard?host=${encodedHost}&ip=${encodedIp}&cpu=${encodedCpu}&ram=${encodedRam}&os=${encodedOs}&brand=${encodedBrand}&model=${encodedModel}&is_rented=${encodedIsRented}&rental_company=${encodedRentalCompany}"
 
 Write-Host " [+] Hostname detectado : $hostname" -ForegroundColor Green
 Write-Host " [+] IP IPv4 detectado  : $ip" -ForegroundColor Green
@@ -87,6 +125,10 @@ Write-Host " [+] Memória RAM        : $ram" -ForegroundColor Cyan
 Write-Host " [+] Sistema Operacional: $os" -ForegroundColor Cyan
 Write-Host " [+] Marca / Fabricante : $brand" -ForegroundColor Magenta
 Write-Host " [+] Modelo              : $model" -ForegroundColor Magenta
+Write-Host " [+] Patrimônio Locado? : $encodedIsRented" -ForegroundColor Yellow
+if ($isRentedFinal -and $rentalCompanyFinal) {
+    Write-Host " [+] Empresa Locadora   : $rentalCompanyFinal" -ForegroundColor Yellow
+}
 Write-Host "-----------------------------------------------------" -ForegroundColor Gray
 Write-Host " Abrindo o formulário de Onboarding no navegador..." -ForegroundColor Cyan
 

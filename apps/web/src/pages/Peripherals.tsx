@@ -24,16 +24,17 @@ import {
   Network,
   Activity
 } from 'lucide-react';
-import { Peripheral, PeripheralCategory, PeripheralSubcategory, Location } from '../types';
+import { Location, Peripheral, PeripheralCategory, PeripheralSubcategory } from '../types';
 import { useAuth } from '../contexts/AuthContext';
 import {
   getPeripherals,
-  getLocations,
   createPeripheral,
   updatePeripheral,
-  deletePeripheral
+  deletePeripheral,
+  getLocations
 } from '../services/api';
 import { getSocket, StatusUpdatedPayload } from '../services/socket';
+import { getLocationFullName } from '../utils/location';
 
 export const Peripherals: React.FC = () => {
   const { isAdmin } = useAuth();
@@ -59,6 +60,8 @@ export const Peripherals: React.FC = () => {
     name: '',
     code: '',
     assetTag: '',
+    ownershipType: 'PROPRIO',
+    rentalCompany: '',
     serialNumber: '',
     category: 'COMPUTADOR' as PeripheralCategory,
     subcategory: 'DESKTOP' as PeripheralSubcategory | '',
@@ -100,8 +103,7 @@ export const Peripherals: React.FC = () => {
   // Real-time WebSockets integration for network poller updates
   useEffect(() => {
     const socket = getSocket();
-    const handleStatusUpdated = (payload: StatusUpdatedPayload) => {
-      console.log('⚡ [Peripherals WebSockets] Evento statusUpdated recebido:', payload);
+    const handleStatusUpdated = (_payload: StatusUpdatedPayload) => {
       loadData();
     };
 
@@ -134,6 +136,8 @@ export const Peripherals: React.FC = () => {
       name: '',
       code: `PER-${Math.floor(1000 + Math.random() * 9000)}`,
       assetTag: '',
+      ownershipType: 'PROPRIO',
+      rentalCompany: '',
       serialNumber: '',
       category: 'COMPUTADOR',
       subcategory: 'DESKTOP',
@@ -153,6 +157,8 @@ export const Peripherals: React.FC = () => {
       name: item.name,
       code: item.code,
       assetTag: item.assetTag || '',
+      ownershipType: item.ownershipType || 'PROPRIO',
+      rentalCompany: item.rentalCompany || item.rental_company || '',
       serialNumber: item.serialNumber || '',
       category: item.category,
       subcategory: item.category === 'COMPUTADOR' ? (item.subcategory || 'DESKTOP') : '',
@@ -272,11 +278,11 @@ export const Peripherals: React.FC = () => {
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-slate-800/80 pb-5">
           <div className="flex items-center gap-4">
             <div className="w-12 h-12 rounded-2xl bg-[#00f2fe]/10 text-[#00f2fe] border border-[#00f2fe]/30 flex items-center justify-center shadow-[0_0_15px_rgba(0,242,254,0.2)] shrink-0">
-              <Layers className="w-6 h-6" />
+              <Laptop className="w-6 h-6" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h1 className="text-xl font-extrabold text-white tracking-tight">Gestão de Informática & Periféricos</h1>
+                <h1 className="text-xl font-extrabold text-white tracking-tight">Gestão de Ativos de TI</h1>
                 <span className="text-xs bg-[#00f2fe]/15 text-[#00f2fe] border border-[#00f2fe]/30 px-3 py-0.5 rounded-full font-mono font-bold">
                   {peripherals.length} Ativos
                 </span>
@@ -721,6 +727,41 @@ export const Peripherals: React.FC = () => {
                   />
                 </div>
 
+                {/* Tipo de Patrimônio */}
+                <div className="space-y-1">
+                  <label className="text-slate-300 font-bold">Tipo de Patrimônio *</label>
+                  <select
+                    value={formData.ownershipType || 'PROPRIO'}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setFormData({
+                        ...formData,
+                        ownershipType: val,
+                        rentalCompany: val === 'PROPRIO' ? '' : formData.rentalCompany,
+                      });
+                    }}
+                    className="w-full bg-[#050811] border border-slate-800 focus:border-cyan-500 text-white rounded-xl px-3 py-2 outline-none cursor-pointer font-bold"
+                  >
+                    <option value="PROPRIO">🏢 Próprio</option>
+                    <option value="LOCADO">📑 Locado (Alugado)</option>
+                  </select>
+                </div>
+
+                {/* Empresa Locadora (Exibido dinamicamente apenas quando LOCADO) */}
+                {formData.ownershipType === 'LOCADO' && (
+                  <div className="space-y-1 bg-amber-500/10 border border-amber-500/30 p-2.5 rounded-xl animate-fadeIn sm:col-span-2">
+                    <label className="text-amber-300 font-bold block">Empresa Locadora *</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="Ex: Simpress, Positivo, Locaweb, etc."
+                      value={formData.rentalCompany}
+                      onChange={(e) => setFormData({ ...formData, rentalCompany: e.target.value })}
+                      className="w-full bg-[#050811] border border-amber-500/40 focus:border-amber-400 text-white rounded-xl px-3 py-2 outline-none font-medium"
+                    />
+                  </div>
+                )}
+
                 {/* Número de Série */}
                 <div className="space-y-1">
                   <label className="text-slate-300 font-bold">Número de Série (S/N)</label>
@@ -786,7 +827,7 @@ export const Peripherals: React.FC = () => {
                     <option value="">Selecione o Local...</option>
                     {locations.map((loc) => (
                       <option key={loc.id} value={loc.id}>
-                        {loc.name} {loc.building ? `- ${loc.building}` : ''}
+                        {getLocationFullName(loc, locations)} {loc.room ? `(${loc.room})` : ''}
                       </option>
                     ))}
                   </select>

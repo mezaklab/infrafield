@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { api, createLocation } from '../services/api';
 import { Location } from '../types';
+import { getLocationFullName } from '../utils/location';
 
 export const OnboardStandalone: React.FC = () => {
   // Read URL query parameters: ?host=...&ip=...&cpu=...&ram=...&os=...&brand=...&model=...
@@ -74,13 +75,8 @@ export const OnboardStandalone: React.FC = () => {
         setLocationId(res.data[0].id);
       }
     } catch (err) {
-      console.warn('Fallback locations fetch:', err);
-      setLocations([
-        { id: 'loc-1', name: 'Datacenter Principal', building: 'Prédio A', room: 'Sala 204' },
-        { id: 'loc-2', name: 'Escritório Central - Rack TI', building: 'Prédio B', room: 'Rack 101' },
-        { id: 'loc-3', name: 'Suporte Técnico / TI', building: 'Prédio C', room: 'Sala 12' },
-      ]);
-      setLocationId('loc-1');
+      console.warn('Locations fetch error:', err);
+      setLocations([]);
     } finally {
       setLoadingLocations(false);
     }
@@ -96,6 +92,8 @@ export const OnboardStandalone: React.FC = () => {
     const osParam    = params.get('os')    || '';
     const brandParam = params.get('brand') || '';
     const modelParam = params.get('model') || '';
+    const isRentedParam   = params.get('is_rented') || params.get('isRented') || params.get('rented') || '';
+    const rentalCompParam = params.get('rental_company') || params.get('rentalCompany') || params.get('company') || '';
 
     setHostname(hostParam);
     setIpAddress(ipParam);
@@ -104,6 +102,11 @@ export const OnboardStandalone: React.FC = () => {
     setOs(osParam);
     if (brandParam && brandParam !== 'N/A') setBrand(brandParam);
     if (modelParam && modelParam !== 'N/A') setModel(modelParam);
+
+    if (isRentedParam === 'true' || isRentedParam === '1') {
+      setOwnershipType('LOCADO');
+      if (rentalCompParam) setOwnerVendor(rentalCompParam);
+    }
 
     if (cpuParam || ramParam || osParam || brandParam || modelParam) {
       setHasHardwareData(true);
@@ -114,6 +117,9 @@ export const OnboardStandalone: React.FC = () => {
 
   const handleOwnershipChange = (newType: 'PROPRIO' | 'LOCADO') => {
     setOwnershipType(newType);
+    if (newType === 'PROPRIO') {
+      setOwnerVendor('');
+    }
   };
 
   const handleCreateLocationSubmit = async (e: React.FormEvent) => {
@@ -167,6 +173,9 @@ export const OnboardStandalone: React.FC = () => {
 
     try {
       setIsSubmitting(true);
+      const isRented = ownershipType === 'LOCADO';
+      const rentalCompanyVal = isRented ? (ownerVendor.trim() || null) : null;
+
       const payload = {
         hostname,
         ipAddress,
@@ -180,6 +189,9 @@ export const OnboardStandalone: React.FC = () => {
         os,
         ownershipType,
         ownerVendor: ownerVendor || (ownershipType === 'PROPRIO' ? 'Município' : 'Locado'),
+        is_rented: isRented,
+        rental_company: rentalCompanyVal,
+        rentalCompany: rentalCompanyVal,
         specifications,
         assignedToName,
         hasMonitor,
@@ -503,7 +515,7 @@ export const OnboardStandalone: React.FC = () => {
                     >
                       {locations.map((loc) => (
                         <option key={loc.id} value={loc.id}>
-                          {loc.name} {loc.room ? `(${loc.room})` : ''}
+                          {getLocationFullName(loc, locations)} {loc.room ? `(${loc.room})` : ''}
                         </option>
                       ))}
                     </select>
@@ -680,14 +692,14 @@ export const OnboardStandalone: React.FC = () => {
           </div>
         )}
 
-        {/* Modal de Cadastro Rápido de Nova Localidade / Setor */}
+        {/* Modal de Cadastro Rápido de Nova Localidade */}
         {isNewLocationModalOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-fadeIn">
             <div className="bg-slate-900 border border-purple-500/40 rounded-3xl p-6 max-w-md w-full shadow-2xl space-y-4">
               <div className="flex items-center justify-between border-b border-slate-800 pb-3">
                 <div className="flex items-center gap-2">
                   <Building2 className="w-5 h-5 text-purple-400" />
-                  <h3 className="text-sm font-extrabold text-white">Cadastrar Nova Localidade / Setor</h3>
+                  <h3 className="text-sm font-extrabold text-white">Cadastrar Nova Localidade</h3>
                 </div>
                 <button
                   type="button"
@@ -700,25 +712,25 @@ export const OnboardStandalone: React.FC = () => {
 
               <form onSubmit={handleCreateLocationSubmit} className="space-y-4 text-xs">
                 <div className="space-y-1">
-                  <label className="text-slate-300 font-bold">Nome do Setor / Secretaria *</label>
+                  <label className="text-slate-300 font-bold">Nome da Localidade *</label>
                   <input
                     type="text"
                     required
-                    placeholder="Ex: Secretaria de Saúde - Almoxarifado"
+                    placeholder="Ex: RH, TI, Matriz, Filial SP, Almoxarifado"
                     value={newLocName}
                     onChange={(e) => setNewLocName(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 text-white rounded-xl px-3 py-2.5 outline-none focus:border-purple-500"
+                    className="w-full bg-slate-950 border border-slate-800 text-white rounded-xl px-3 py-2.5 outline-none focus:border-purple-500 font-medium"
                   />
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-slate-300 font-bold">Prédio / Edifício</label>
+                  <label className="text-slate-300 font-bold">Prédio / Bloco</label>
                   <input
                     type="text"
-                    placeholder="Ex: Prédio Central"
+                    placeholder="Ex: Bloco A, Prédio Central"
                     value={newLocBuilding}
                     onChange={(e) => setNewLocBuilding(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 text-white rounded-xl px-3 py-2.5 outline-none focus:border-purple-500"
+                    className="w-full bg-slate-950 border border-slate-800 text-white rounded-xl px-3 py-2.5 outline-none focus:border-purple-500 font-medium"
                   />
                 </div>
 

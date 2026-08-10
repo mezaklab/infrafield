@@ -12,15 +12,19 @@ import {
   X, 
   KeyRound,
   Mail,
-  ShieldAlert
+  ShieldAlert,
+  Building2,
+  User,
 } from 'lucide-react';
 import { api } from '../../services/api';
-import { SystemUser } from '../../types';
+import { SystemUser, Location } from '../../types';
 import { useAuth } from '../../contexts/AuthContext';
+import { getLocationFullName } from '../../utils/location';
 
 export const AdminUsers: React.FC = () => {
   const { user: currentUser } = useAuth();
   const [users, setUsers] = useState<SystemUser[]>([]);
+  const [locations, setLocations] = useState<Location[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [search, setSearch] = useState<string>('');
   const [roleFilter, setRoleFilter] = useState<string>('ALL');
@@ -30,19 +34,25 @@ export const AdminUsers: React.FC = () => {
   const [editingUser, setEditingUser] = useState<SystemUser | null>(null);
   const [formData, setFormData] = useState({
     name: '',
+    username: '',
     email: '',
     password: '',
-    role: 'TECHNICIAN' as 'SUPERADMIN' | 'ADMIN' | 'MANAGER' | 'TECHNICIAN' | 'VIEWER',
+    role: 'SUPERADMIN' as 'SUPERADMIN' | 'ADMIN' | 'MANAGER' | 'TECHNICIAN' | 'VIEWER' | 'USUARIO',
+    locationId: '',
   });
   const [formError, setFormError] = useState<string | null>(null);
   const [formSuccess, setFormSuccess] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
-  const fetchUsers = async () => {
+  const fetchUsersAndLocations = async () => {
     try {
       setLoading(true);
-      const res = await api.get<SystemUser[]>('/admin/users');
-      setUsers(res.data);
+      const [usersRes, locsRes] = await Promise.all([
+        api.get<SystemUser[]>('/admin/users'),
+        api.get<Location[]>('/locations').catch(() => ({ data: [] })),
+      ]);
+      setUsers(usersRes.data);
+      setLocations(locsRes.data || []);
     } catch (err: any) {
       console.warn('Fallback backend users list:', err);
       // Fallback data if backend database is empty or offline
@@ -76,9 +86,9 @@ export const AdminUsers: React.FC = () => {
         },
         {
           id: 'usr-4',
-          name: 'Mariana Costa (Gerente)',
-          email: 'mariana.costa@infrafield.io',
-          role: 'MANAGER',
+          name: 'João Pedro (Usuário)',
+          email: 'joao.pedro@infrafield.io',
+          role: 'USUARIO',
           companyId: 'comp-1',
           company: { id: 'comp-1', name: 'TechCorp Infraestrutura S.A.' },
           createdAt: new Date().toISOString(),
@@ -90,7 +100,7 @@ export const AdminUsers: React.FC = () => {
   };
 
   useEffect(() => {
-    fetchUsers();
+    fetchUsersAndLocations();
   }, []);
 
   const handleOpenModal = (userToEdit?: SystemUser) => {
@@ -100,17 +110,21 @@ export const AdminUsers: React.FC = () => {
       setEditingUser(userToEdit);
       setFormData({
         name: userToEdit.name,
+        username: userToEdit.username || '',
         email: userToEdit.email,
         password: '',
         role: userToEdit.role,
+        locationId: userToEdit.locationId || '',
       });
     } else {
       setEditingUser(null);
       setFormData({
         name: '',
+        username: '',
         email: '',
         password: '',
-        role: 'TECHNICIAN',
+        role: 'USUARIO',
+        locationId: '',
       });
     }
     setIsModalOpen(true);
@@ -126,8 +140,8 @@ export const AdminUsers: React.FC = () => {
     setFormError(null);
     setFormSuccess(null);
 
-    if (!formData.name || !formData.email) {
-      setFormError('Nome e E-mail são obrigatórios.');
+    if (!formData.name || !formData.email || (!editingUser && !formData.username)) {
+      setFormError('Nome, E-mail e Nome de Usuário são obrigatórios.');
       return;
     }
     if (!editingUser && !formData.password) {
@@ -137,20 +151,24 @@ export const AdminUsers: React.FC = () => {
 
     try {
       setIsSubmitting(true);
+      const payload = {
+        ...formData,
+        locationId: formData.locationId || null,
+      };
+
       if (editingUser) {
-        await api.put(`/admin/users/${editingUser.id}`, formData);
+        await api.put(`/admin/users/${editingUser.id}`, payload);
         setFormSuccess('Usuário atualizado com sucesso!');
         setTimeout(() => {
           handleCloseModal();
-          fetchUsers();
+          fetchUsersAndLocations();
         }, 1000);
       } else {
-        // Create user
-        await api.post('/admin/users', formData);
+        await api.post('/admin/users', payload);
         setFormSuccess('Usuário criado com sucesso!');
         setTimeout(() => {
           handleCloseModal();
-          fetchUsers();
+          fetchUsersAndLocations();
         }, 1000);
       }
     } catch (err: any) {
@@ -168,7 +186,7 @@ export const AdminUsers: React.FC = () => {
     try {
       await api.delete(`/admin/users/${id}`);
       alert(`Usuário ${userEmail} removido com sucesso.`);
-      fetchUsers();
+      fetchUsersAndLocations();
     } catch (err: any) {
       alert(err.response?.data?.error || 'Erro ao remover usuário.');
     }
@@ -208,6 +226,12 @@ export const AdminUsers: React.FC = () => {
         return (
           <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-blue-500/20 text-blue-300 border border-blue-500/40 w-fit">
             TECHNICIAN
+          </span>
+        );
+      case 'USUARIO':
+        return (
+          <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 w-fit">
+            USUÁRIO
           </span>
         );
       default:
@@ -265,6 +289,7 @@ export const AdminUsers: React.FC = () => {
           <option value="ADMIN">ADMIN</option>
           <option value="MANAGER">MANAGER</option>
           <option value="TECHNICIAN">TECHNICIAN</option>
+          <option value="USUARIO">USUÁRIO</option>
           <option value="VIEWER">VIEWER</option>
         </select>
       </div>
@@ -287,6 +312,7 @@ export const AdminUsers: React.FC = () => {
                 <tr className="bg-slate-950/60 border-b border-slate-800 text-[11px] font-bold uppercase tracking-wider text-slate-400">
                   <th className="px-6 py-4">Usuário / E-mail</th>
                   <th className="px-6 py-4">Perfil RBAC</th>
+                  <th className="px-6 py-4">Setor / Localidade</th>
                   <th className="px-6 py-4">Empresa</th>
                   <th className="px-6 py-4">Criado em</th>
                   <th className="px-6 py-4 text-right">Ações</th>
@@ -300,6 +326,8 @@ export const AdminUsers: React.FC = () => {
                         <div className={`w-9 h-9 rounded-xl flex items-center justify-center font-bold text-xs ${
                           usr.role === 'SUPERADMIN' 
                             ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' 
+                            : usr.role === 'USUARIO'
+                            ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
                             : 'bg-purple-500/20 text-purple-300 border border-purple-500/30'
                         }`}>
                           {usr.name.slice(0, 2).toUpperCase()}
@@ -313,6 +341,10 @@ export const AdminUsers: React.FC = () => {
 
                     <td className="px-6 py-4">
                       {getRoleBadge(usr.role)}
+                    </td>
+
+                    <td className="px-6 py-4 text-xs font-semibold text-cyan-300">
+                      {usr.location?.name || 'Não Vinculado'}
                     </td>
 
                     <td className="px-6 py-4 text-slate-300 text-xs">
@@ -401,6 +433,20 @@ export const AdminUsers: React.FC = () => {
               </div>
 
               <div className="space-y-1">
+                <label className="text-xs font-semibold text-slate-300">Nome de Usuário (Login)</label>
+                <div className="relative">
+                  <User className="w-4 h-4 absolute left-3 top-3 text-slate-500" />
+                  <input
+                    type="text"
+                    required
+                    pattern="[a-z]+\.[a-z]+"
+                    title="Use o formato nome.sobrenome, apenas letras minúsculas e ponto."
+                    value={formData.username}
+                    onChange={(e) => setFormData({ ...formData, username: e.target.value })}
+                    placeholder="Digite seu usuário, ex: mezak.filho"
+                    className="w-full pl-9 pr-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white text-sm focus:outline-none focus:border-purple-500 font-mono"
+                  />
+                </div>
                 <label className="text-xs font-semibold text-slate-300">E-mail Corporativo</label>
                 <div className="relative">
                   <Mail className="w-4 h-4 absolute left-3 top-3 text-slate-500" />
@@ -438,12 +484,32 @@ export const AdminUsers: React.FC = () => {
                   onChange={(e) => setFormData({ ...formData, role: e.target.value as any })}
                   className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white text-sm font-semibold focus:outline-none focus:border-purple-500"
                 >
-                  <option value="SUPERADMIN">SUPERADMIN — Acesso Total e Edição Global</option>
-                  <option value="ADMIN">ADMIN — Acesso Backoffice e Gestão</option>
+                  <option value="USUARIO">USUÁRIO — Abertura e Acompanhamento de Chamados</option>
+                  <option value="TECHNICIAN">TECHNICIAN — Técnico de Campo / Atendimento</option>
                   <option value="MANAGER">MANAGER — Gestor de Operações e Visitas</option>
-                  <option value="TECHNICIAN">TECHNICIAN — Técnico de Campo</option>
+                  <option value="ADMIN">ADMIN — Acesso Backoffice e Gestão</option>
+                  <option value="SUPERADMIN">SUPERADMIN — Acesso Total e Edição Global</option>
                   <option value="VIEWER">VIEWER — Apenas Leitura e Auditoria</option>
                 </select>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-slate-300">Setor / Localidade Vinculada</label>
+                <div className="relative">
+                  <Building2 className="w-4 h-4 absolute left-3 top-3 text-slate-500 pointer-events-none" />
+                  <select
+                    value={formData.locationId}
+                    onChange={(e) => setFormData({ ...formData, locationId: e.target.value })}
+                    className="w-full pl-9 pr-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white text-sm font-semibold focus:outline-none focus:border-purple-500"
+                  >
+                    <option value="">Nenhum Setor Selecionado</option>
+                    {locations.map((loc) => (
+                      <option key={loc.id} value={loc.id}>
+                        {getLocationFullName(loc, locations)} {loc.room ? `(${loc.room})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
 
               <div className="pt-3 flex items-center justify-end gap-3">

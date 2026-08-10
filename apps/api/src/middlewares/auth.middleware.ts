@@ -7,6 +7,7 @@ const JWT_SECRET = process.env.JWT_SECRET || 'infrafield-secret-change-in-produc
 export interface JwtPayload {
   userId: string;
   email: string;
+  username?: string;
   role: Role;
   companyId: string;
 }

@@ -12,6 +12,7 @@ interface AppLayoutProps {
   onRefresh?: () => void;
   onOpenScanner?: () => void;
   onNavigateToAdmin?: () => void;
+  onOpenCreateTicket?: () => void;
 }
 
 export const AppLayout: React.FC<AppLayoutProps> = ({
@@ -22,21 +23,24 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
   onRefresh,
   onOpenScanner,
   onNavigateToAdmin,
+  onOpenCreateTicket,
 }) => {
   const getTitle = () => {
     switch (activeTab) {
       case 'dashboard':
-        return 'NOC // Prefeitura Municipal - Setor de TI';
+        return 'Operações & Infraestrutura de TI';
       case 'assets':
-        return 'Gestão de Ativos';
+        return 'Gestão de Redes & Infraestrutura';
       case 'visits':
         return 'Visitas Técnicas de Campo';
       case 'issues':
         return 'Gestão de Não Conformidades';
       case 'peripherals':
-        return 'Gestão de Informática & Periféricos';
-      case 'onboarding':
-        return 'Onboarding Automático de Equipamentos';
+        return 'Gestão de Ativos de TI';
+      case 'tickets':
+        return 'Central de Chamados & Helpdesk';
+      case 'ticket-dashboard':
+        return 'Dashboard & Métricas Helpdesk';
       default:
         return 'InfraField';
     }
@@ -50,6 +54,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
         setActiveTab={setActiveTab} 
         onLogout={onLogout} 
         onNavigateToAdmin={onNavigateToAdmin} 
+        onOpenCreateTicket={onOpenCreateTicket}
       />
 
       {/* Main Content Area */}

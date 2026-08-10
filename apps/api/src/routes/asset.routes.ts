@@ -11,6 +11,9 @@ const CreateAssetSchema = z.object({
   name: z.string().min(3, 'Nome é obrigatório'),
   code: z.string().min(2, 'Código é obrigatório'),
   assetTag: z.string().optional(),
+  ownershipType: z.string().optional().nullable(),
+  rentalCompany: z.string().optional().nullable(),
+  rental_company: z.string().optional().nullable(),
   serialNumber: z.string().optional(),
   hostname: z.string().optional(),
   ipAddress: z.string().optional(),
@@ -115,6 +118,9 @@ assetRouter.post('/onboard', async (req: Request, res: Response) => {
       os, 
       ownershipType, 
       ownerVendor, 
+      is_rented,
+      rental_company,
+      rentalCompany,
       specifications, 
       assignedToName,
       hasMonitor,
@@ -129,6 +135,11 @@ assetRouter.post('/onboard', async (req: Request, res: Response) => {
       res.status(400).json({ error: 'Hostname e Endereço IP são obrigatórios para o onboarding.' });
       return;
     }
+
+    // Determine ownership type and rental company from payload (supporting is_rented boolean flag or ownershipType string)
+    const isRented = is_rented === true || is_rented === 'true' || ownershipType === 'LOCADO';
+    const computedOwnershipType = isRented ? 'LOCADO' : 'PROPRIO';
+    const computedRentalCompany = isRented ? (rental_company || rentalCompany || ownerVendor || null) : null;
 
     // 1. Obter empresa padrão
     const firstCompany = await prisma.company.findFirst();
@@ -148,7 +159,7 @@ assetRouter.post('/onboard', async (req: Request, res: Response) => {
       cpu && cpu !== 'N/A' && `CPU: ${cpu}`,
       ram && ram !== 'N/A' && `RAM: ${ram}`,
       os && os !== 'N/A' && `OS: ${os}`,
-      ownershipType && `Vínculo: ${ownershipType === 'LOCADO' ? `Locado (${ownerVendor || 'Empresa Imprima'})` : 'Próprio (Município)'}`,
+      computedOwnershipType && `Vínculo: ${computedOwnershipType === 'LOCADO' ? `Locado (${computedRentalCompany || 'Empresa Locadora'})` : 'Próprio (Município)'}`,
       specifications && `Obs: ${specifications}`,
     ].filter(Boolean).join(' | ');
 
@@ -188,6 +199,8 @@ assetRouter.post('/onboard', async (req: Request, res: Response) => {
         data: {
           name: String(hostname),
           assetTag: assetTag || existingPeripheral.assetTag,
+          ownershipType: computedOwnershipType,
+          rentalCompany: computedRentalCompany,
           category: PeripheralCategory.COMPUTADOR,
           subcategory: subcategoryEnum,
           brand: (brand && brand !== 'N/A') ? brand : existingPeripheral.brand,
@@ -209,6 +222,8 @@ assetRouter.post('/onboard', async (req: Request, res: Response) => {
           name: String(hostname),
           code: periphCode,
           assetTag: assetTag || `PAT-${Date.now().toString().slice(-5)}`,
+          ownershipType: computedOwnershipType,
+          rentalCompany: computedRentalCompany,
           category: PeripheralCategory.COMPUTADOR,
           subcategory: subcategoryEnum,
           brand: (brand && brand !== 'N/A') ? brand : null,
@@ -232,7 +247,9 @@ assetRouter.post('/onboard', async (req: Request, res: Response) => {
     if (hasMonitor) {
       const monCode = `MON-${cleanHost || Date.now().toString().slice(-6)}`;
       const monName = [monitorBrand, monitorModel].filter(Boolean).join(' ') || `Monitor Tela (${hostname})`;
-      const monSpecs = `Vínculo: ${monitorOwnershipType === 'LOCADO' ? `Locado (${monitorOwnerVendor || 'Licitação'})` : 'Próprio'}`;
+      const isMonRented = monitorOwnershipType === 'LOCADO';
+      const monRentalComp = isMonRented ? (monitorOwnerVendor || null) : null;
+      const monSpecs = `Vínculo: ${isMonRented ? `Locado (${monRentalComp || 'Empresa Locadora'})` : 'Próprio'}`;
 
       try {
         monitorResult = await prisma.peripheral.create({
@@ -240,6 +257,8 @@ assetRouter.post('/onboard', async (req: Request, res: Response) => {
             name: monName,
             code: monCode,
             assetTag: monitorAssetTag || `PAT-MON-${Date.now().toString().slice(-5)}`,
+            ownershipType: isMonRented ? 'LOCADO' : 'PROPRIO',
+            rentalCompany: monRentalComp,
             category: PeripheralCategory.MONITOR,
             brand: monitorBrand || null,
             model: monitorModel || null,

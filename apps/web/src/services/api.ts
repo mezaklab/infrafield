@@ -74,6 +74,8 @@ export const createLocation = async (data: {
   building?: string;
   floor?: string;
   room?: string;
+  parentId?: string | null;
+  parent_id?: string | null;
 }): Promise<Location> => {
   const response = await api.post('/locations', data);
   return response.data;
@@ -81,7 +83,7 @@ export const createLocation = async (data: {
 
 export const updateLocation = async (
   id: string,
-  data: Partial<{ name: string; building: string; floor: string; room: string }>
+  data: Partial<{ name: string; building: string; floor: string; room: string; parentId: string | null; parent_id: string | null }>
 ): Promise<Location> => {
   const response = await api.patch(`/locations/${id}`, data);
   return response.data;

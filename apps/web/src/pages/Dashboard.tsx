@@ -167,8 +167,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
   useEffect(() => {
     const socket = getSocket();
 
-    const handleStatusUpdated = (payload: StatusUpdatedPayload) => {
-      console.log('⚡ [Dashboard WebSockets] Evento statusUpdated recebido em tempo real:', payload);
+    const handleStatusUpdated = (_payload: StatusUpdatedPayload) => {
       // Atualiza os indicadores e métricas executivas em tempo real
       loadData();
     };
@@ -228,7 +227,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
 
             <div>
               <div className="flex items-center gap-2 flex-wrap">
-                <h3 className="text-base font-extrabold text-white tracking-tight">NOC // Prefeitura Municipal - Setor de TI</h3>
+                <h3 className="text-base font-extrabold text-white tracking-tight">NOC // Operações &amp; Infraestrutura de TI</h3>
                 {loadingHealth ? (
                   <span className="text-xs bg-slate-800 text-slate-400 px-2.5 py-0.5 rounded-full flex items-center gap-1">
                     <RefreshCw className="w-3 h-3 animate-spin text-[#00f2fe]" /> Verificando conexão...
@@ -557,8 +556,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
                   <Building className="w-6 h-6" />
                 </div>
                 <div>
-                  <h3 className="text-base font-extrabold text-white tracking-tight">Gerenciamento de Localidades & Setores</h3>
-                  <p className="text-xs text-slate-400">Prédios, secretarias, salas e infraestrutura NOC</p>
+                  <h3 className="text-base font-extrabold text-white tracking-tight">Gerenciamento de Localidades</h3>
+                  <p className="text-xs text-slate-400">Matrizes, filiais, prédios e departamentos corporativos</p>
                 </div>
               </div>
               <div className="flex items-center gap-2">
@@ -567,7 +566,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
                   className="px-3.5 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold text-xs rounded-xl flex items-center gap-1.5 transition-all cursor-pointer shadow-lg shadow-emerald-500/20"
                 >
                   <Plus className="w-4 h-4 stroke-[3]" />
-                  <span>Novo Setor</span>
+                  <span>Nova Localidade</span>
                 </button>
                 <button
                   onClick={() => setIsLocationsModalOpen(false)}
@@ -578,12 +577,12 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
               </div>
             </div>
 
-            {/* Form Inline de Criar / Editar Setor */}
+            {/* Form Inline de Criar / Editar Localidade */}
             {isLocationFormOpen && (
               <form onSubmit={handleSaveLocation} className="p-4 rounded-2xl bg-[#050811] border border-emerald-500/30 space-y-3 animate-fadeIn text-xs">
                 <div className="flex items-center justify-between">
                   <h4 className="font-bold text-white text-xs">
-                    {editingLocation ? 'Editar Localidade / Setor' : 'Cadastrar Nova Localidade / Setor'}
+                    {editingLocation ? 'Editar Localidade' : 'Cadastrar Nova Localidade'}
                   </h4>
                   <button
                     type="button"
@@ -596,25 +595,25 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div className="space-y-1">
-                    <label className="text-slate-300 font-bold">Nome do Setor / Secretaria *</label>
+                    <label className="text-slate-300 font-bold">Nome da Localidade *</label>
                     <input
                       type="text"
                       required
-                      placeholder="Ex: Sec. de Saúde - Almoxarifado"
+                      placeholder="Ex: RH, TI, Matriz, Filial SP, Almoxarifado"
                       value={locName}
                       onChange={(e) => setLocName(e.target.value)}
-                      className="w-full bg-[#080d1a] border border-slate-800 text-white rounded-xl px-3 py-2 outline-none focus:border-emerald-500"
+                      className="w-full bg-[#080d1a] border border-slate-800 text-white rounded-xl px-3 py-2 outline-none focus:border-emerald-500 font-medium"
                     />
                   </div>
 
                   <div className="space-y-1">
-                    <label className="text-slate-300 font-bold">Prédio / Edifício</label>
+                    <label className="text-slate-300 font-bold">Prédio / Bloco</label>
                     <input
                       type="text"
-                      placeholder="Ex: Prédio Central"
+                      placeholder="Ex: Bloco A, Prédio Central"
                       value={locBuilding}
                       onChange={(e) => setLocBuilding(e.target.value)}
-                      className="w-full bg-[#080d1a] border border-slate-800 text-white rounded-xl px-3 py-2 outline-none focus:border-emerald-500"
+                      className="w-full bg-[#080d1a] border border-slate-800 text-white rounded-xl px-3 py-2 outline-none focus:border-emerald-500 font-medium"
                     />
                   </div>
 

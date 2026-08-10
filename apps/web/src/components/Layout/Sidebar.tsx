@@ -1,5 +1,18 @@
 import React from 'react';
-import { LayoutDashboard, Box, MapPin, AlertTriangle, LogOut, Server, Layers, ShieldCheck, ArrowRight, Sparkles } from 'lucide-react';
+import { 
+  LayoutDashboard, 
+  Network, 
+  MapPin, 
+  AlertTriangle, 
+  LogOut, 
+  Server, 
+  Laptop, 
+  ShieldCheck, 
+  ArrowRight, 
+  Headset,
+  BarChart3,
+  PlusCircle
+} from 'lucide-react';
 import { TabType } from '../../types';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -8,25 +21,38 @@ interface SidebarProps {
   setActiveTab: (tab: TabType) => void;
   onLogout: () => void;
   onNavigateToAdmin?: () => void;
+  onOpenCreateTicket?: () => void;
 }
 
-export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, onLogout, onNavigateToAdmin }) => {
-  const { user, isSuperAdmin } = useAuth();
+export const Sidebar: React.FC<SidebarProps> = ({ 
+  activeTab, 
+  setActiveTab, 
+  onLogout, 
+  onNavigateToAdmin,
+  onOpenCreateTicket
+}) => {
+  const { user, isSuperAdmin, isFinalUser } = useAuth();
   const hasAdminRole = user?.role === 'SUPERADMIN' || user?.role === 'ADMIN';
 
-  const navItems = [
-    { id: 'dashboard' as TabType, label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'assets' as TabType, label: 'Ativos TI & Redes', icon: Box },
+  const mainNavItems = [
+    { id: 'dashboard' as TabType, label: 'Dashboard NOC', icon: LayoutDashboard },
+    { id: 'assets' as TabType, label: 'Redes', icon: Network },
     { id: 'visits' as TabType, label: 'Visitas & Vistorias', icon: MapPin },
     { id: 'issues' as TabType, label: 'Não Conformidades', icon: AlertTriangle },
-    { id: 'peripherals' as TabType, label: 'Periféricos', icon: Layers },
-    { id: 'onboarding' as TabType, label: 'Onboarding PC', icon: Sparkles },
+    { id: 'peripherals' as TabType, label: 'Ativos de TI', icon: Laptop },
   ];
 
+  const helpdeskNavItems = isFinalUser
+    ? [{ id: 'tickets' as TabType, label: 'Meus Chamados', icon: Headset }]
+    : [
+        { id: 'ticket-dashboard' as TabType, label: 'Dashboard Helpdesk', icon: BarChart3 },
+        { id: 'tickets' as TabType, label: 'Chamados', icon: Headset },
+      ];
+
   return (
-    <aside className="hidden md:flex flex-col w-64 bg-slate-900 border-r border-slate-800 h-screen sticky top-0 p-4 select-none">
+    <aside className="hidden md:flex flex-col w-64 bg-slate-900 border-r border-slate-800 h-screen sticky top-0 p-4 select-none overflow-y-auto custom-scrollbar">
       {/* Brand Header */}
-      <div className="flex items-center gap-3 px-3 py-4 mb-6 border-b border-slate-800/80">
+      <div className="flex items-center gap-3 px-3 py-4 mb-4 border-b border-slate-800/80">
         <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center shadow-lg shadow-cyan-500/20 text-white font-bold">
           <Server className="w-6 h-6" />
         </div>
@@ -34,40 +60,86 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, onLog
           <h1 className="font-extrabold text-lg text-white tracking-tight flex items-center gap-1.5">
             InfraField <span className="text-[10px] font-bold bg-[#00f2fe]/10 text-[#00f2fe] border border-[#00f2fe]/20 px-2 py-0.5 rounded-full">v1.0</span>
           </h1>
-          <p className="text-xs text-slate-400">Gestão de Infraestrutura</p>
+          <p className="text-xs text-slate-400">{isFinalUser ? 'Central de Suporte' : 'Gestão de Infraestrutura'}</p>
         </div>
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 space-y-1.5">
-        <div className="px-3 text-[11px] font-semibold uppercase tracking-wider text-slate-500 mb-2">
-          Menu Principal
-        </div>
-        {navItems.map((item) => {
-          const Icon = item.icon;
-          const isActive = activeTab === item.id;
-          return (
+      <nav className="flex-1 space-y-4">
+        {/* Main Section (hidden for USUARIO role) */}
+        {!isFinalUser && (
+          <div>
+            <div className="px-3 text-[11px] font-semibold uppercase tracking-wider text-slate-500 mb-1.5">
+              Infraestrutura & NOC
+            </div>
+            <div className="space-y-1">
+              {mainNavItems.map((item) => {
+                const Icon = item.icon;
+                const isActive = activeTab === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => setActiveTab(item.id)}
+                    className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-medium text-xs transition-all duration-200 ${
+                      isActive
+                        ? 'bg-gradient-to-r from-cyan-500/15 to-blue-500/10 text-cyan-400 border border-cyan-500/30 shadow-sm'
+                        : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+                    }`}
+                  >
+                    <Icon className={`w-4 h-4 shrink-0 transition-transform ${isActive ? 'scale-110 text-cyan-400' : ''}`} />
+                    <span className="truncate whitespace-nowrap">{item.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Helpdesk Section */}
+        <div>
+          <div className="px-3 text-[11px] font-semibold uppercase tracking-wider text-cyan-400/80 mb-1.5 flex items-center justify-between">
+            <span>{isFinalUser ? 'Suporte & Atendimento' : 'Helpdesk'}</span>
+          </div>
+          <div className="space-y-1">
+            {helpdeskNavItems.map((item) => {
+              const Icon = item.icon;
+              const isActive = activeTab === item.id;
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => setActiveTab(item.id)}
+                  className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-medium text-xs transition-all duration-200 ${
+                    isActive
+                      ? 'bg-gradient-to-r from-cyan-500/20 to-blue-500/15 text-[#00f2fe] border border-cyan-500/40 shadow-md shadow-cyan-500/10'
+                      : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+                  }`}
+                >
+                  <Icon className={`w-4 h-4 shrink-0 transition-transform ${isActive ? 'scale-110 text-[#00f2fe]' : ''}`} />
+                  <span className="truncate whitespace-nowrap">{item.label}</span>
+                </button>
+              );
+            })}
+
+            {/* Novo Chamado Quick Action */}
             <button
-              key={item.id}
-              onClick={() => setActiveTab(item.id)}
-              className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl font-medium text-sm transition-all duration-200 ${
-                isActive
-                  ? 'bg-gradient-to-r from-cyan-500/15 to-blue-500/10 text-cyan-400 border border-cyan-500/30 shadow-sm'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
-              }`}
+              onClick={() => {
+                setActiveTab('tickets');
+                if (onOpenCreateTicket) onOpenCreateTicket();
+              }}
+              className="w-full flex items-center gap-3 px-3.5 py-2 rounded-xl font-bold text-xs bg-cyan-500/10 hover:bg-cyan-500/20 text-[#00f2fe] border border-cyan-500/30 transition-all group mt-1"
             >
-              <Icon className={`w-5 h-5 shrink-0 transition-transform ${isActive ? 'scale-110 text-cyan-400' : ''}`} />
-              <span className="truncate whitespace-nowrap">{item.label}</span>
+              <PlusCircle className="w-4 h-4 shrink-0 text-[#00f2fe] group-hover:rotate-90 transition-transform" />
+              <span>{isFinalUser ? 'Abrir Novo Chamado' : 'Novo Chamado'}</span>
             </button>
-          );
-        })}
+          </div>
+        </div>
 
         {/* Dedicated Backoffice Button (Exibido APENAS para SUPERADMIN e ADMIN) */}
         {hasAdminRole && onNavigateToAdmin && (
-          <div className="pt-3">
+          <div className="pt-2 border-t border-slate-800/80">
             <button
               onClick={onNavigateToAdmin}
-              className="w-full flex items-center justify-between px-3.5 py-3 rounded-xl font-bold text-xs bg-gradient-to-r from-purple-900/60 to-indigo-900/60 text-purple-300 border border-purple-500/40 hover:border-purple-400/60 transition-all shadow-md shadow-purple-950/40 group"
+              className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl font-bold text-xs bg-gradient-to-r from-purple-900/60 to-indigo-900/60 text-purple-300 border border-purple-500/40 hover:border-purple-400/60 transition-all shadow-md shadow-purple-950/40 group"
             >
               <div className="flex items-center gap-2.5">
                 <ShieldCheck className="w-4 h-4 text-purple-400 group-hover:rotate-12 transition-transform" />

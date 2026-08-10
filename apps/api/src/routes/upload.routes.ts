@@ -27,18 +27,15 @@ const storage = multer.diskStorage({
 
 const upload = multer({
   storage,
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
-  fileFilter: (_req, file, cb) => {
-    if (file.mimetype.startsWith('image/')) {
-      cb(null, true);
-    } else {
-      cb(new Error('Apenas arquivos de imagem são permitidos.'));
-    }
+  limits: { fileSize: 50 * 1024 * 1024 }, // 50MB limit to accommodate video/image prints
+  fileFilter: (_req, _file, cb) => {
+    // Allow images, videos, text, pdfs, logs, etc.
+    cb(null, true);
   },
 });
 
-// POST /api/upload - Single photo upload
-uploadRouter.post('/', upload.single('photo'), (req: Request, res: Response) => {
+// POST /api/upload - File/Photo attachment upload
+uploadRouter.post('/', upload.single('file'), (req: Request, res: Response) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: 'Nenhum arquivo enviado.' });
@@ -48,9 +45,11 @@ uploadRouter.post('/', upload.single('photo'), (req: Request, res: Response) => 
     return res.status(201).json({
       url: fileUrl,
       filename: req.file.filename,
+      originalname: req.file.originalname,
       size: req.file.size,
+      mimetype: req.file.mimetype,
     });
   } catch (error) {
-    return res.status(500).json({ error: 'Erro ao salvar upload de imagem.' });
+    return res.status(500).json({ error: 'Erro ao salvar upload de arquivo.' });
   }
 });

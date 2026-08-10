@@ -11,7 +11,7 @@ const JWT_SECRET = process.env.JWT_SECRET || 'infrafield-secret-change-in-produc
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '8h';
 
 const LoginSchema = z.object({
-  email: z.string().email('E-mail inválido'),
+  identifier: z.string().min(1, 'Identificador (usuário ou e-mail) é obrigatório'),
   password: z.string().min(1, 'Senha é obrigatória'),
 });
 
@@ -23,25 +23,35 @@ authRouter.post('/login', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Dados inválidos', details: parsed.error.format() });
     }
 
-    const { email, password } = parsed.data;
+    const { identifier, password } = parsed.data;
+    const loginInput = identifier.trim().toLowerCase();
 
-    const user = await prisma.user.findUnique({
-      where: { email },
-      include: { company: { select: { id: true, name: true } } },
+    const user = await prisma.user.findFirst({
+      where: {
+        OR: [
+          { username: loginInput },
+          { email: loginInput },
+        ],
+      },
+      include: {
+        company: { select: { id: true, name: true } },
+        location: { select: { id: true, name: true, building: true, room: true } },
+      },
     });
 
     if (!user) {
-      return res.status(401).json({ error: 'E-mail ou senha incorretos.' });
+      return res.status(401).json({ error: 'Credenciais inválidas.' });
     }
 
     const passwordMatch = await bcrypt.compare(password, user.password);
     if (!passwordMatch) {
-      return res.status(401).json({ error: 'E-mail ou senha incorretos.' });
+      return res.status(401).json({ error: 'Credenciais inválidas.' });
     }
 
     const payload = {
       userId: user.id,
       email: user.email,
+      username: user.username,
       role: user.role,
       companyId: user.companyId,
     };
@@ -54,8 +64,11 @@ authRouter.post('/login', async (req: Request, res: Response) => {
         id: user.id,
         name: user.name,
         email: user.email,
+        username: user.username,
         role: user.role,
         company: user.company,
+        locationId: user.locationId,
+        location: user.location,
       },
     });
   } catch (error) {
@@ -73,8 +86,11 @@ authRouter.get('/me', requireAuth, async (req: Request, res: Response) => {
         id: true,
         name: true,
         email: true,
+        username: true,
         role: true,
         company: { select: { id: true, name: true } },
+        locationId: true,
+        location: { select: { id: true, name: true, building: true, room: true } },
       },
     });
 

@@ -19,11 +19,12 @@ const prisma = new PrismaClient();
 async function main() {
   console.log('🌱 Starting InfraField v0.4 Database Seeding...');
   const HASH_ROUNDS = 10;
-  const superadminPasswordHash = await bcrypt.hash('191003', HASH_ROUNDS);
-  const adminPasswordHash = await bcrypt.hash('admin123', HASH_ROUNDS);
-  const techPasswordHash = await bcrypt.hash('tecnico123', HASH_ROUNDS);
-  const managerPasswordHash = await bcrypt.hash('gestor123', HASH_ROUNDS);
-  const viewerPasswordHash = await bcrypt.hash('viewer123', HASH_ROUNDS);
+  const superadminPasswordHash  = await bcrypt.hash('191003',    HASH_ROUNDS);
+  const adminPasswordHash       = await bcrypt.hash('admin123',  HASH_ROUNDS);
+  const techPasswordHash        = await bcrypt.hash('tecnico123',HASH_ROUNDS);
+  const techSimplePasswordHash  = await bcrypt.hash('123',       HASH_ROUNDS);
+  const managerPasswordHash     = await bcrypt.hash('gestor123', HASH_ROUNDS);
+  const viewerPasswordHash      = await bcrypt.hash('viewer123', HASH_ROUNDS);
 
   // Clean existing tables in reverse order of foreign keys
   await prisma.auditLog.deleteMany().catch(() => {});
@@ -72,9 +73,11 @@ async function main() {
   console.log('✅ 2 Locations created:', [location1.name, location2.name].join(', '));
 
   // 3. Create Users
+
   const superadmin = await prisma.user.create({
     data: {
       name: 'SuperAdmin Geral',
+      username: 'superadmin.geral',
       email: 'superadmin@infrafield.local',
       password: superadminPasswordHash,
       role: Role.SUPERADMIN,
@@ -85,6 +88,7 @@ async function main() {
   const admin = await prisma.user.create({
     data: {
       name: 'Administrador InfraField',
+      username: 'administrador.infrafield',
       email: 'admin@infrafield.io',
       password: adminPasswordHash,
       role: Role.ADMIN,
@@ -92,11 +96,10 @@ async function main() {
     },
   });
 
-  const techSimplePasswordHash = await bcrypt.hash('123', HASH_ROUNDS);
-
   const techDev = await prisma.user.create({
     data: {
       name: 'Técnico de Campo (Dev)',
+      username: 'tecnico.dev',
       email: 'tecnico@infrafield.local',
       password: techSimplePasswordHash,
       role: Role.TECHNICIAN,
@@ -107,6 +110,7 @@ async function main() {
   const tech = await prisma.user.create({
     data: {
       name: 'Carlos Silva (Técnico)',
+      username: 'carlos.tecnico',
       email: 'carlos.silva@infrafield.io',
       password: techPasswordHash,
       role: Role.TECHNICIAN,
@@ -117,6 +121,7 @@ async function main() {
   const manager = await prisma.user.create({
     data: {
       name: 'Mariana Costa (Gerente)',
+      username: 'mariana.gerente',
       email: 'mariana.costa@infrafield.io',
       password: managerPasswordHash,
       role: Role.MANAGER,
@@ -127,6 +132,7 @@ async function main() {
   const viewer = await prisma.user.create({
     data: {
       name: 'Lucas Andrade (Auditor)',
+      username: 'lucas.auditor',
       email: 'lucas.andrade@infrafield.io',
       password: viewerPasswordHash,
       role: Role.VIEWER,

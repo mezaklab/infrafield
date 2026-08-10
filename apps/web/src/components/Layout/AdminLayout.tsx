@@ -62,10 +62,10 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
     },
     {
       id: 'locations' as AdminTabType,
-      label: 'Localidades & Setores',
+      label: 'Localidades',
       path: '/admin/locations',
       icon: Building2,
-      description: 'Prédios, secretarias e salas',
+      description: 'Matrizes, filiais, prédios e departamentos',
     },
     {
       id: 'settings' as AdminTabType,
@@ -95,8 +95,8 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
         };
       case 'locations':
         return {
-          title: 'Localidades & Setores',
-          subtitle: 'Prédios, secretarias e salas disponíveis no catálogo do InfraField',
+          title: 'Localidades Corporativas',
+          subtitle: 'Matrizes, filiais, prédios e departamentos disponíveis no catálogo',
         };
       case 'settings':
         return {

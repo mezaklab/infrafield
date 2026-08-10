@@ -7,21 +7,58 @@ import { z } from 'zod';
 const prisma = new PrismaClient();
 export const adminRouter = Router();
 
+// ─── Helper functions for username ──────────────────────────────────────────
+function sanitizeUsername(input: string): string {
+  return input
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9.]/g, '');
+}
+
+function generateDefaultUsername(name: string, email?: string): string {
+  if (name) {
+    const parts = name
+      .trim()
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9\s.]/g, '')
+      .split(/\s+/)
+      .filter(Boolean);
+
+    if (parts.length >= 2) {
+      return `${parts[0]}.${parts[parts.length - 1]}`;
+    } else if (parts.length === 1) {
+      return parts[0];
+    }
+  }
+  if (email) {
+    return sanitizeUsername(email.split('@')[0]);
+  }
+  return 'usuario';
+}
+
 // ─── Validation Schemas ───────────────────────────────────────────────────────
 
 const CreateUserSchema = z.object({
   name: z.string().min(2, 'Nome é obrigatório'),
+  username: z.string().optional(),
   email: z.string().email('E-mail inválido'),
   password: z.string().min(4, 'Senha deve ter no mínimo 4 caracteres'),
   role: z.nativeEnum(Role).optional().default(Role.TECHNICIAN),
   companyId: z.string().optional(),
+  locationId: z.string().optional().nullable(),
 });
 
 const UpdateUserSchema = z.object({
   name: z.string().min(2).optional(),
+  username: z.string().optional(),
   email: z.string().email().optional(),
   role: z.nativeEnum(Role).optional(),
   password: z.string().min(4).optional(),
+  locationId: z.string().optional().nullable(),
 });
 
 // ─── Helper: log audit event (best-effort) ───────────────────────────────────
@@ -46,56 +83,46 @@ async function audit(
 adminRouter.get('/dashboard', async (_req: Request, res: Response) => {
   try {
     const [
-      totalUsers,
-      totalAssets,
-      totalPeripherals,
-      totalVisits,
-      totalIssues,
-      auditLogsCount,
-      superadminCount,
-      adminCount,
-      managerCount,
+      companyCount,
+      locationCount,
+      userCount,
       technicianCount,
-      viewerCount,
+      activeVisitsCount,
+      openTicketsCount,
     ] = await Promise.all([
+      prisma.company.count(),
+      prisma.location.count(),
       prisma.user.count(),
-      prisma.asset.count(),
-      prisma.peripheral.count(),
-      prisma.visit.count(),
-      prisma.issue.count(),
-      prisma.auditLog.count().catch(() => 0),
-      prisma.user.count({ where: { role: Role.SUPERADMIN } }),
-      prisma.user.count({ where: { role: Role.ADMIN } }),
-      prisma.user.count({ where: { role: Role.MANAGER } }),
       prisma.user.count({ where: { role: Role.TECHNICIAN } }),
-      prisma.user.count({ where: { role: Role.VIEWER } }),
+      prisma.visit.count({ where: { status: 'EM_ANDAMENTO' } }),
+      prisma.ticket.count({ where: { status: { in: ['ABERTO', 'EM_ATENDIMENTO', 'AGUARDANDO_USUARIO'] } } }),
     ]);
 
+    const auditLogs = await prisma.auditLog.findMany({
+      take: 10,
+      orderBy: { createdAt: 'desc' },
+    });
+
     res.json({
-      success: true,
-      stats: {
-        totalUsers,
-        totalAssets,
-        totalPeripherals,
-        totalVisits,
-        totalIssues,
-        auditLogsCount,
-        usersByRole: {
-          SUPERADMIN: superadminCount,
-          ADMIN: adminCount,
-          MANAGER: managerCount,
-          TECHNICIAN: technicianCount,
-          VIEWER: viewerCount,
-        },
-        systemHealth: 'OPERATIONAL',
-        serverUptimeSeconds: Math.floor(process.uptime()),
-        environment: process.env.NODE_ENV || 'development',
-        dbConnection: 'HEALTHY',
+      companyCount,
+      locationCount,
+      userCount,
+      technicianCount,
+      activeVisitsCount,
+      openTicketsCount,
+      byRole: {
+        SUPERADMIN: await prisma.user.count({ where: { role: Role.SUPERADMIN } }),
+        ADMIN: await prisma.user.count({ where: { role: Role.ADMIN } }),
+        MANAGER: await prisma.user.count({ where: { role: Role.MANAGER } }),
+        TECHNICIAN: technicianCount,
+        USUARIO: await prisma.user.count({ where: { role: Role.USUARIO } }),
+        VIEWER: await prisma.user.count({ where: { role: Role.VIEWER } }),
       },
+      auditLogs,
     });
   } catch (error) {
-    console.error('[ADMIN] Dashboard error:', error);
-    res.status(500).json({ error: 'Erro ao buscar métricas do dashboard administrativo.' });
+    console.error('[ADMIN] GET /dashboard error:', error);
+    res.status(500).json({ error: 'Erro ao buscar dados do dashboard.' });
   }
 });
 
@@ -107,9 +134,12 @@ adminRouter.get('/users', async (_req: Request, res: Response) => {
         id: true,
         name: true,
         email: true,
+        username: true,
         role: true,
         companyId: true,
         company: { select: { id: true, name: true } },
+        locationId: true,
+        location: { select: { id: true, name: true, building: true, room: true } },
         createdAt: true,
         updatedAt: true,
       },
@@ -131,11 +161,18 @@ adminRouter.post('/users', async (req: Request, res: Response) => {
       return;
     }
 
-    const { name, email, password, role, companyId: bodyCompanyId } = parsed.data;
+    const { name, username, email, password, role, companyId: bodyCompanyId, locationId } = parsed.data;
 
     const existingUser = await prisma.user.findUnique({ where: { email } });
     if (existingUser) {
       res.status(400).json({ error: 'Já existe um usuário cadastrado com este e-mail.' });
+      return;
+    }
+
+    const finalUsername = username ? sanitizeUsername(username) : generateDefaultUsername(name, email);
+    const existingUsername = await prisma.user.findFirst({ where: { username: finalUsername } });
+    if (existingUsername) {
+      res.status(400).json({ error: `O nome de usuário "${finalUsername}" já está em uso.` });
       return;
     }
 
@@ -152,14 +189,25 @@ adminRouter.post('/users', async (req: Request, res: Response) => {
     const hashedPassword = await bcrypt.hash(password, 10);
 
     const newUser = await prisma.user.create({
-      data: { name, email, password: hashedPassword, role, companyId: targetCompanyId },
+      data: {
+        name,
+        email,
+        username: finalUsername,
+        password: hashedPassword,
+        role,
+        companyId: targetCompanyId,
+        locationId: locationId || undefined,
+      },
       select: {
         id: true,
         name: true,
         email: true,
+        username: true,
         role: true,
         companyId: true,
         company: { select: { id: true, name: true } },
+        locationId: true,
+        location: { select: { id: true, name: true, building: true, room: true } },
         createdAt: true,
       },
     });
@@ -168,7 +216,7 @@ adminRouter.post('/users', async (req: Request, res: Response) => {
       'USER_CREATED',
       req.user?.email ?? 'SYSTEM_ADMIN',
       req.user?.role ?? 'ADMIN',
-      `Novo usuário criado: ${newUser.email} com role ${newUser.role}`,
+      `Novo usuário criado: ${newUser.username} (${newUser.email}) com role ${newUser.role}`,
       req.ip,
     );
 
@@ -189,12 +237,22 @@ adminRouter.put('/users/:id', async (req: Request, res: Response) => {
       return;
     }
 
-    const { name, email, role, password } = parsed.data;
+    const { name, username, email, role, password, locationId } = parsed.data;
     const updateData: Record<string, unknown> = {};
-    if (name)     updateData.name = name;
-    if (email)    updateData.email = email;
-    if (role)     updateData.role = role;
-    if (password) updateData.password = await bcrypt.hash(password, 10);
+    if (name)                    updateData.name = name;
+    if (email)                   updateData.email = email;
+    if (username) {
+      const sanitized = sanitizeUsername(username);
+      const existing = await prisma.user.findFirst({ where: { username: sanitized, id: { not: id } } });
+      if (existing) {
+        res.status(400).json({ error: `O nome de usuário "${sanitized}" já está em uso.` });
+        return;
+      }
+      updateData.username = sanitized;
+    }
+    if (role)                    updateData.role = role;
+    if (password)                updateData.password = await bcrypt.hash(password, 10);
+    if (locationId !== undefined) updateData.locationId = locationId || null;
 
     const updatedUser = await prisma.user.update({
       where: { id },
@@ -203,9 +261,12 @@ adminRouter.put('/users/:id', async (req: Request, res: Response) => {
         id: true,
         name: true,
         email: true,
+        username: true,
         role: true,
         companyId: true,
         company: { select: { id: true, name: true } },
+        locationId: true,
+        location: { select: { id: true, name: true, building: true, room: true } },
         updatedAt: true,
       },
     });

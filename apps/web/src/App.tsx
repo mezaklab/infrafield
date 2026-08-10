@@ -8,6 +8,8 @@ import { Assets } from './pages/Assets';
 import { Visits } from './pages/Visits';
 import { Issues } from './pages/Issues';
 import { Peripherals } from './pages/Peripherals';
+import { Tickets } from './pages/Tickets';
+import { TicketDashboard } from './pages/TicketDashboard';
 import { OnboardStandalone } from './pages/OnboardStandalone';
 
 import { AdminDashboard } from './pages/Admin/AdminDashboard';
@@ -21,12 +23,13 @@ import { QRScannerModal } from './components/Camera/QRScannerModal';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 
 const AppInner: React.FC = () => {
-  const { isAuthenticated, logout } = useAuth();
+  const { isAuthenticated, logout, isFinalUser } = useAuth();
   const [activeTab, setActiveTab] = useState<TabType>('dashboard');
   const [activeAdminTab, setActiveAdminTab] = useState<AdminTabType>('dashboard');
   const [currentPath, setCurrentPath] = useState<string>(() => window.location.pathname);
   const [refreshKey, setRefreshKey] = useState<number>(0);
   const [isGlobalScannerOpen, setIsGlobalScannerOpen] = useState<boolean>(false);
+  const [isCreateTicketModalOpen, setIsCreateTicketModalOpen] = useState<boolean>(false);
 
   // Sync window location pathname & history
   useEffect(() => {
@@ -37,8 +40,19 @@ const AppInner: React.FC = () => {
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
-  // Update active tabs when path changes
+  // Update active tabs when path changes and enforce USUARIO restrictions
   useEffect(() => {
+    if (isFinalUser) {
+      setActiveTab('tickets');
+      if (currentPath.startsWith('/admin') || currentPath !== '/tickets') {
+        if (window.location.pathname !== '/tickets') {
+          window.history.replaceState({}, '', '/tickets');
+        }
+        setCurrentPath('/tickets');
+      }
+      return;
+    }
+
     if (currentPath.startsWith('/admin')) {
       if (currentPath.includes('/users')) setActiveAdminTab('users');
       else if (currentPath.includes('/audit-logs')) setActiveAdminTab('audit-logs');
@@ -47,8 +61,12 @@ const AppInner: React.FC = () => {
       else setActiveAdminTab('dashboard');
     } else if (currentPath.startsWith('/perifericos') || currentPath.startsWith('/peripherals')) {
       setActiveTab('peripherals');
+    } else if (currentPath.includes('/tickets/dashboard') || currentPath.includes('/helpdesk/dashboard')) {
+      setActiveTab('ticket-dashboard');
+    } else if (currentPath.startsWith('/tickets') || currentPath.startsWith('/chamados')) {
+      setActiveTab('tickets');
     }
-  }, [currentPath]);
+  }, [currentPath, isFinalUser]);
 
   const navigateToPath = (path: string) => {
     if (window.location.pathname !== path) {
@@ -110,13 +128,19 @@ const AppInner: React.FC = () => {
       onRefresh={() => setRefreshKey((prev) => prev + 1)}
       onOpenScanner={() => setIsGlobalScannerOpen(true)}
       onNavigateToAdmin={() => navigateToPath('/admin/dashboard')}
+      onOpenCreateTicket={() => {
+        setActiveTab('tickets');
+        setIsCreateTicketModalOpen(true);
+      }}
     >
       <div key={refreshKey}>
-        {activeTab === 'dashboard'   && <Dashboard onNavigate={(tab) => setActiveTab(tab)} />}
-        {activeTab === 'assets'      && <Assets />}
-        {activeTab === 'visits'      && <Visits />}
-        {activeTab === 'issues'      && <Issues />}
-        {activeTab === 'peripherals' && <Peripherals />}
+        {activeTab === 'dashboard'        && <Dashboard onNavigate={(tab) => setActiveTab(tab)} />}
+        {activeTab === 'ticket-dashboard' && <TicketDashboard onNavigateToTickets={() => { setActiveTab('tickets'); navigateToPath('/tickets'); }} />}
+        {activeTab === 'tickets'          && <Tickets isCreateOpen={isCreateTicketModalOpen} onCloseCreateModal={() => setIsCreateTicketModalOpen(false)} />}
+        {activeTab === 'assets'           && <Assets />}
+        {activeTab === 'visits'           && <Visits />}
+        {activeTab === 'issues'           && <Issues />}
+        {activeTab === 'peripherals'      && <Peripherals />}
       </div>
 
       {/* Global QR Code / Camera Scanner Modal */}

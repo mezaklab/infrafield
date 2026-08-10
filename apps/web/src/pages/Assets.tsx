@@ -28,6 +28,7 @@ import {
 import { Asset, Location } from '../types';
 import { getAssets, createAsset, updateAsset, deleteAsset, getLocations, downloadInventoryPDFReport, exportAssetsCSV } from '../services/api';
 import { getSocket, StatusUpdatedPayload } from '../services/socket';
+import { getLocationFullName } from '../utils/location';
 
 /**
  * Mapeamento MOCADO COM PNGs REAIS DE VERDADE com Fundo Transparente.
@@ -86,11 +87,13 @@ export const Assets: React.FC = () => {
   const [editingAssetId, setEditingAssetId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  // Form states for asset creation & editing (com campo imageUrl)
+  // Form states for asset creation & editing (com campo imageUrl, ownershipType e rentalCompany)
   const [assetForm, setAssetForm] = useState({
     name: '',
     code: '',
     assetTag: '',
+    ownershipType: 'PROPRIO',
+    rentalCompany: '',
     serialNumber: '',
     hostname: '',
     ipAddress: '',
@@ -100,8 +103,6 @@ export const Assets: React.FC = () => {
     imageUrl: '',
     wifiBands: '',
   });
-
-
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -133,7 +134,6 @@ export const Assets: React.FC = () => {
     const socket = getSocket();
 
     const handleStatusUpdated = (payload: StatusUpdatedPayload) => {
-      console.log('⚡ [Assets WebSockets] Evento statusUpdated recebido:', payload);
 
       setAssets((prevAssets) =>
         prevAssets.map((asset) => {
@@ -171,6 +171,8 @@ export const Assets: React.FC = () => {
       name: '',
       code: '',
       assetTag: '',
+      ownershipType: 'PROPRIO',
+      rentalCompany: '',
       serialNumber: '',
       hostname: '',
       ipAddress: '',
@@ -189,6 +191,8 @@ export const Assets: React.FC = () => {
       name: asset.name,
       code: asset.code,
       assetTag: asset.assetTag || '',
+      ownershipType: asset.ownershipType || 'PROPRIO',
+      rentalCompany: asset.rentalCompany || asset.rental_company || '',
       serialNumber: asset.serialNumber || '',
       hostname: asset.hostname || '',
       ipAddress: asset.ipAddress || '',
@@ -415,7 +419,7 @@ export const Assets: React.FC = () => {
         <div>
           <h2 className="text-xl font-bold text-white tracking-tight flex items-center gap-2">
             <Activity className="w-5 h-5 text-[#00f2fe]" />
-            Catálogo de Ativos de Infraestrutura & TI
+            Catálogo &amp; Monitoramento de Redes
           </h2>
           <p className="text-xs text-slate-400">Telemetria em tempo real, serial, hostname e portas ativas</p>
         </div>
@@ -759,7 +763,7 @@ export const Assets: React.FC = () => {
 
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">Código ID</label>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">Código ID *</label>
                   <input
                     type="text"
                     value={assetForm.code}
@@ -780,6 +784,52 @@ export const Assets: React.FC = () => {
                   />
                 </div>
               </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">Tipo de Patrimônio *</label>
+                  <select
+                    value={assetForm.ownershipType || 'PROPRIO'}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setAssetForm({
+                        ...assetForm,
+                        ownershipType: val,
+                        rentalCompany: val === 'PROPRIO' ? '' : assetForm.rentalCompany,
+                      });
+                    }}
+                    className="w-full bg-[#050811] border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 cursor-pointer font-bold"
+                  >
+                    <option value="PROPRIO">🏢 Próprio</option>
+                    <option value="LOCADO">📑 Locado (Alugado)</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">Número de Série (S/N)</label>
+                  <input
+                    type="text"
+                    value={assetForm.serialNumber}
+                    onChange={(e) => setAssetForm({ ...assetForm, serialNumber: e.target.value })}
+                    placeholder="Ex: SN-9988-X"
+                    className="w-full bg-[#050811] border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 font-mono"
+                  />
+                </div>
+              </div>
+
+              {/* Empresa Locadora (Exibido dinamicamente apenas quando LOCADO) */}
+              {assetForm.ownershipType === 'LOCADO' && (
+                <div className="bg-amber-500/10 border border-amber-500/30 p-2.5 rounded-xl animate-fadeIn">
+                  <label className="block text-xs font-bold text-amber-300 mb-1">Empresa Locadora *</label>
+                  <input
+                    type="text"
+                    required
+                    value={assetForm.rentalCompany}
+                    onChange={(e) => setAssetForm({ ...assetForm, rentalCompany: e.target.value })}
+                    placeholder="Ex: Simpress, Positivo, Locaweb, etc."
+                    className="w-full bg-[#050811] border border-amber-500/40 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-amber-400 font-medium"
+                  />
+                </div>
+              )}
 
               <div className="grid grid-cols-2 gap-2">
                 <div>
@@ -871,7 +921,7 @@ export const Assets: React.FC = () => {
                   <option value="">Selecione um local...</option>
                   {locations.map((loc) => (
                     <option key={loc.id} value={loc.id}>
-                      {loc.name} {loc.building ? `(${loc.building})` : ''}
+                      {getLocationFullName(loc, locations)} {loc.room ? `(${loc.room})` : ''}
                     </option>
                   ))}
                 </select>

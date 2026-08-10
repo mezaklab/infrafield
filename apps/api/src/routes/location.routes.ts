@@ -13,6 +13,8 @@ const LocationWriteSchema = z.object({
   floor: z.string().optional(),
   room: z.string().optional(),
   companyId: z.string().optional(),
+  parentId: z.string().optional().nullable(),
+  parent_id: z.string().optional().nullable(),
 });
 
 const LocationPatchSchema = z.object({
@@ -20,6 +22,8 @@ const LocationPatchSchema = z.object({
   building: z.string().optional(),
   floor: z.string().optional(),
   room: z.string().optional(),
+  parentId: z.string().optional().nullable(),
+  parent_id: z.string().optional().nullable(),
 });
 
 // ─── Public: GET /api/locations ───────────────────────────────────────────────
@@ -34,6 +38,8 @@ locationRouter.get('/', async (req: Request, res: Response) => {
     const locations = await prisma.location.findMany({
       where,
       include: {
+        parent: { select: { id: true, name: true } },
+        children: { select: { id: true, name: true } },
         company: { select: { id: true, name: true } },
         _count: { select: { assets: true, visits: true } },
       },
@@ -65,13 +71,20 @@ locationRouter.post('/', requireAuth, async (req: Request, res: Response) => {
       companyId = company.id;
     }
 
+    const parentId = parsed.data.parentId || parsed.data.parent_id || null;
+
     const location = await prisma.location.create({
       data: {
         name: parsed.data.name,
         building: parsed.data.building,
         floor: parsed.data.floor,
         room: parsed.data.room,
+        parentId: parentId || null,
         companyId,
+      },
+      include: {
+        parent: { select: { id: true, name: true } },
+        children: { select: { id: true, name: true } },
       },
     });
 
@@ -91,9 +104,26 @@ locationRouter.patch('/:id', requireAuth, async (req: Request, res: Response) =>
       return res.status(400).json({ error: 'Dados inválidos', details: parsed.error.format() });
     }
 
+    const parentId = parsed.data.parentId !== undefined ? parsed.data.parentId : (parsed.data.parent_id !== undefined ? parsed.data.parent_id : undefined);
+
+    const dataToUpdate: any = {
+      name: parsed.data.name,
+      building: parsed.data.building,
+      floor: parsed.data.floor,
+      room: parsed.data.room,
+    };
+
+    if (parentId !== undefined) {
+      dataToUpdate.parentId = parentId || null;
+    }
+
     const updated = await prisma.location.update({
       where: { id },
-      data: parsed.data,
+      data: dataToUpdate,
+      include: {
+        parent: { select: { id: true, name: true } },
+        children: { select: { id: true, name: true } },
+      },
     });
     return res.json(updated);
   } catch (error) {

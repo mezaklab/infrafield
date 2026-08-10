@@ -1,0 +1,23 @@
+# Build output
+dist/
+*.tsbuildinfo
+
+# Vite cache
+.vite/
+node_modules/.vite/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# PWA generated
+dist/sw.js
+dist/workbox-*.js
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS
+.DS_Store

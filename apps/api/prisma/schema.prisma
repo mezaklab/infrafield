@@ -13,6 +13,22 @@ enum Role {
   MANAGER
   TECHNICIAN
   VIEWER
+  USUARIO
+}
+
+enum TicketStatus {
+  ABERTO
+  EM_ATENDIMENTO
+  AGUARDANDO_USUARIO
+  RESOLVIDO
+  CANCELADO
+}
+
+enum TicketPriority {
+  BAIXA
+  MEDIA
+  ALTA
+  CRITICA
 }
 
 enum AssetStatus {
@@ -99,6 +115,7 @@ model Company {
   peripherals Peripheral[]
   visits      Visit[]
   issues      Issue[]
+  tickets     Ticket[]
 
   @@map("companies")
 }
@@ -111,13 +128,20 @@ model Location {
   room      String?
   companyId String
   company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  parentId  String?    @map("parent_id")
+  parent    Location?  @relation("LocationHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
+  children  Location[] @relation("LocationHierarchy")
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  users       User[]
   assets      Asset[]
   peripherals Peripheral[]
   visits      Visit[]
   issues      Issue[]
+  tickets     Ticket[]
 
   @@map("locations")
 }
@@ -126,27 +150,37 @@ model User {
   id        String   @id @default(uuid())
   name      String
   email     String   @unique
+  username  String?  @unique
   password  String
   role      Role     @default(TECHNICIAN)
   companyId String
   company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  locationId String?
+  location   Location? @relation(fields: [locationId], references: [id], onDelete: SetNull)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  assets         Asset[]
-  peripherals    Peripheral[]
-  visits         Visit[]
-  reportedIssues Issue[]
+  assets           Asset[]
+  peripherals      Peripheral[]
+  visits           Visit[]
+  reportedIssues   Issue[]
+  authoredTickets  Ticket[]        @relation("TicketAuthor")
+  assignedTickets  Ticket[]        @relation("TicketTechnician")
+  ticketMessages   TicketMessage[]
 
   @@map("users")
 }
 
 model Asset {
-  id           String      @id @default(uuid())
-  name         String
-  code         String      @unique
-  assetTag     String?     // Patrimônio
-  serialNumber String?
+  id            String      @id @default(uuid())
+  name          String
+  code          String      @unique
+  assetTag      String?     // Patrimônio
+  ownershipType String?     @default("PROPRIO") // Tipo de Patrimônio: 'PROPRIO' | 'LOCADO'
+  rentalCompany String?     @map("rental_company") // Empresa Locadora
+  serialNumber  String?
   hostname     String?
   ipAddress    String?
   category     String
@@ -166,6 +200,7 @@ model Asset {
   visitAssets        VisitAsset[]
   checklistResponses ChecklistResponse[]
   issues             Issue[]
+  tickets            Ticket[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -320,6 +355,8 @@ model Peripheral {
   name           String
   code           String                 @unique
   assetTag       String?                // Patrimônio
+  ownershipType  String?                @default("PROPRIO") // Tipo de Patrimônio: 'PROPRIO' | 'LOCADO'
+  rentalCompany  String?                @map("rental_company") // Empresa Locadora
   serialNumber   String?
   category       PeripheralCategory     @default(COMPUTADOR)
   subcategory    PeripheralSubcategory? // DESKTOP ou NOTEBOOK (quando category == COMPUTADOR)
@@ -365,6 +402,53 @@ model SystemSetting {
   updatedAt DateTime @updatedAt
 
   @@map("system_settings")
+}
+
+model Ticket {
+  id          String         @id @default(uuid())
+  code        String         @unique
+  subject     String
+  description String
+  status      TicketStatus   @default(ABERTO)
+  priority    TicketPriority @default(MEDIA)
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  locationId String?
+  location   Location? @relation(fields: [locationId], references: [id], onDelete: SetNull)
+
+  assetId String?
+  asset   Asset?  @relation(fields: [assetId], references: [id], onDelete: SetNull)
+
+  authorId String
+  author   User   @relation("TicketAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+
+  assignedToId String?
+  assignedTo   User?   @relation("TicketTechnician", fields: [assignedToId], references: [id], onDelete: SetNull)
+
+  messages TicketMessage[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("tickets")
+}
+
+model TicketMessage {
+  id       String @id @default(uuid())
+  ticketId String
+  ticket   Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  senderId String
+  sender   User   @relation(fields: [senderId], references: [id], onDelete: Cascade)
+
+  content     String
+  attachments String? // JSON string array of upload URLs
+
+  createdAt DateTime @default(now())
+
+  @@map("ticket_messages")
 }
 
 

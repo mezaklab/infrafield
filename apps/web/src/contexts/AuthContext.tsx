@@ -1,26 +1,31 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { api } from '../services/api';
+import { Location } from '../types';
 
-export type UserRole = 'SUPERADMIN' | 'ADMIN' | 'MANAGER' | 'TECHNICIAN' | 'VIEWER';
+export type UserRole = 'SUPERADMIN' | 'ADMIN' | 'MANAGER' | 'TECHNICIAN' | 'VIEWER' | 'USUARIO';
 
 export interface AuthUser {
   id: string;
   name: string;
   email: string;
+  username?: string;
   role: UserRole;
   company: { id: string; name: string };
+  locationId?: string;
+  location?: Location;
 }
 
 interface AuthContextValue {
   user: AuthUser | null;
   token: string | null;
   isAuthenticated: boolean;
-  isSuperAdmin: boolean;  // SUPERADMIN only
-  isAdmin: boolean;       // SUPERADMIN or ADMIN
-  isManager: boolean;     // SUPERADMIN, ADMIN or MANAGER
-  isTechnician: boolean;  // TECHNICIAN
-  canAccessAdmin: boolean;// SUPERADMIN or ADMIN
-  login: (email: string, password: string) => Promise<void>;
+  isSuperAdmin: boolean;   // SUPERADMIN only
+  isAdmin: boolean;        // SUPERADMIN or ADMIN
+  isManager: boolean;      // SUPERADMIN, ADMIN or MANAGER
+  isTechnician: boolean;   // TECHNICIAN
+  isFinalUser: boolean;    // USUARIO
+  canAccessAdmin: boolean; // SUPERADMIN or ADMIN
+  login: (username: string, password: string) => Promise<void>;
   logout: () => void;
 }
 
@@ -45,8 +50,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, [token]);
 
-  const login = useCallback(async (email: string, password: string) => {
-    const response = await api.post<{ token: string; user: AuthUser }>('/auth/login', { email, password });
+  const login = useCallback(async (username: string, password: string) => {
+    const response = await api.post<{ token: string; user: AuthUser }>('/auth/login', { identifier: username, password });
     const { token: newToken, user: newUser } = response.data;
 
     localStorage.setItem(TOKEN_KEY, newToken);
@@ -65,14 +70,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const isAuthenticated = !!user && !!token;
-  const isSuperAdmin = user?.role === 'SUPERADMIN';
-  const isAdmin      = user?.role === 'SUPERADMIN' || user?.role === 'ADMIN';
-  const isManager    = user?.role === 'SUPERADMIN' || user?.role === 'ADMIN' || user?.role === 'MANAGER';
-  const isTechnician = user?.role === 'TECHNICIAN';
+  const isSuperAdmin   = user?.role === 'SUPERADMIN';
+  const isAdmin        = user?.role === 'SUPERADMIN' || user?.role === 'ADMIN';
+  const isManager      = user?.role === 'SUPERADMIN' || user?.role === 'ADMIN' || user?.role === 'MANAGER';
+  const isTechnician   = user?.role === 'TECHNICIAN';
+  const isFinalUser    = user?.role === 'USUARIO';
   const canAccessAdmin = isSuperAdmin || isAdmin;
 
   return (
-    <AuthContext.Provider value={{ user, token, isAuthenticated, isSuperAdmin, isAdmin, isManager, isTechnician, canAccessAdmin, login, logout }}>
+    <AuthContext.Provider value={{ user, token, isAuthenticated, isSuperAdmin, isAdmin, isManager, isTechnician, isFinalUser, canAccessAdmin, login, logout }}>
       {children}
     </AuthContext.Provider>
   );

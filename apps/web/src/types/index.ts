@@ -1,13 +1,16 @@
-export type TabType = 'dashboard' | 'assets' | 'visits' | 'issues' | 'peripherals' | 'onboarding';
+export type TabType = 'dashboard' | 'assets' | 'visits' | 'issues' | 'peripherals' | 'tickets' | 'ticket-dashboard';
 export type AdminTabType = 'dashboard' | 'users' | 'audit-logs' | 'settings' | 'locations';
 
 export interface SystemUser {
   id: string;
   name: string;
   email: string;
-  role: 'SUPERADMIN' | 'ADMIN' | 'MANAGER' | 'TECHNICIAN' | 'VIEWER';
+  username?: string;
+  role: 'SUPERADMIN' | 'ADMIN' | 'MANAGER' | 'TECHNICIAN' | 'VIEWER' | 'USUARIO';
   companyId: string;
   company?: { id: string; name: string };
+  locationId?: string;
+  location?: Location;
   createdAt: string;
   updatedAt?: string;
 }
@@ -68,6 +71,10 @@ export interface Location {
   building?: string;
   floor?: string;
   room?: string;
+  parentId?: string;
+  parent_id?: string;
+  parent?: { id: string; name: string };
+  children?: { id: string; name: string }[];
 }
 
 export type PeripheralCategory = 'COMPUTADOR' | 'IMPRESSORA' | 'SCANNER' | 'MONITOR';
@@ -78,6 +85,9 @@ export interface Peripheral {
   code: string;
   name: string;
   assetTag?: string;
+  ownershipType?: string;
+  rentalCompany?: string;
+  rental_company?: string;
   serialNumber?: string;
   category: PeripheralCategory;
   subcategory?: PeripheralSubcategory;
@@ -116,6 +126,9 @@ export interface Asset {
   code: string;
   name: string;
   assetTag?: string;
+  ownershipType?: string;
+  rentalCompany?: string;
+  rental_company?: string;
   serialNumber?: string;
   hostname?: string;
   ipAddress?: string;
@@ -239,5 +252,77 @@ export interface NotificationItem {
   isRead: boolean;
   assetId?: string;
   createdAt: string;
+}
+
+export type TicketStatus = 'ABERTO' | 'EM_ATENDIMENTO' | 'AGUARDANDO_USUARIO' | 'RESOLVIDO' | 'CANCELADO';
+export type TicketPriority = 'BAIXA' | 'MEDIA' | 'ALTA' | 'CRITICA';
+
+export interface TicketMessage {
+  id: string;
+  ticketId: string;
+  senderId: string;
+  sender?: {
+    id: string;
+    name: string;
+    email: string;
+    role: 'SUPERADMIN' | 'ADMIN' | 'MANAGER' | 'TECHNICIAN' | 'VIEWER' | 'USUARIO';
+  };
+  content: string;
+  attachments?: string | null; // JSON string array
+  createdAt: string;
+}
+
+export interface Ticket {
+  id: string;
+  code: string;
+  subject: string;
+  description: string;
+  status: TicketStatus;
+  priority: TicketPriority;
+  companyId: string;
+  locationId?: string | null;
+  location?: Location | null;
+  assetId?: string | null;
+  asset?: {
+    id: string;
+    name: string;
+    code: string;
+    category?: string;
+    assetTag?: string;
+  } | null;
+  authorId: string;
+  author?: {
+    id: string;
+    name: string;
+    email: string;
+    role: 'SUPERADMIN' | 'ADMIN' | 'MANAGER' | 'TECHNICIAN' | 'VIEWER' | 'USUARIO';
+  };
+  assignedToId?: string | null;
+  assignedTo?: {
+    id: string;
+    name: string;
+    email: string;
+    role: 'SUPERADMIN' | 'ADMIN' | 'MANAGER' | 'TECHNICIAN' | 'VIEWER' | 'USUARIO';
+  } | null;
+  messages?: TicketMessage[];
+  _count?: {
+    messages: number;
+  };
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface HelpdeskDashboardData {
+  kpis: {
+    totalActive: number;
+    overdueSla: number;
+    resolvedMonth: number;
+    avgResolutionTime: string;
+  };
+  charts: {
+    evolution: { month: string; abertos: number; solucionados: number }[];
+    sectorDistribution: { name: string; value: number; color: string }[];
+    topIncidents: { equipment: string; count: number }[];
+  };
 }
 

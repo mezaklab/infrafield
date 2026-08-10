@@ -25,7 +25,7 @@ export const Header: React.FC<HeaderProps> = ({ title, onRefresh }) => {
               <Activity className="w-3 h-3 text-[#00f2fe] animate-heartbeat" /> NOC // SETOR DE TI
             </span>
           </div>
-          <p className="text-xs text-slate-400 hidden sm:block">Prefeitura Municipal — Departamento de TI & Infraestrutura de Rede</p>
+          <p className="text-xs text-slate-400 hidden sm:block">Operações &amp; Infraestrutura de TI</p>
         </div>
       </div>
 
