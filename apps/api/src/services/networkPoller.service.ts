@@ -167,6 +167,21 @@ export async function pollNetworkAssets(): Promise<void> {
 }
 
 let pollerInterval: NodeJS.Timeout | null = null;
+let pollerRunning = false;
+
+async function runPollerCycle(): Promise<void> {
+  if (pollerRunning) {
+    console.warn('[NetworkPoller] Ciclo anterior ainda em execução; nova execução ignorada.');
+    return;
+  }
+
+  pollerRunning = true;
+  try {
+    await pollNetworkAssets();
+  } finally {
+    pollerRunning = false;
+  }
+}
 
 /**
  * Inicializa o worker de monitoramento continuo a cada N milissegundos (padrão: 60s)
@@ -174,13 +189,20 @@ let pollerInterval: NodeJS.Timeout | null = null;
 export function startNetworkPoller(intervalMs: number = 60000): void {
   console.log(`\n🚀 [NetworkPoller] Serviço de Active Polling ICMP inicializado (Intervalo: ${intervalMs / 1000}s)`);
 
-  pollNetworkAssets();
+  void runPollerCycle();
 
   if (pollerInterval) {
     clearInterval(pollerInterval);
   }
 
   pollerInterval = setInterval(() => {
-    pollNetworkAssets();
+    void runPollerCycle();
   }, intervalMs);
+}
+
+export function stopNetworkPoller(): void {
+  if (pollerInterval) {
+    clearInterval(pollerInterval);
+    pollerInterval = null;
+  }
 }

@@ -1,9 +1,9 @@
 import { Router, Request, Response } from 'express';
 import { z } from 'zod';
 import { TicketStatus, TicketPriority, Role } from '@prisma/client';
-import axios from 'axios';
 import { prisma } from '../lib/prisma';
 import { getIO } from '../services/websocket.service';
+import { sendTicketNotification } from '../services/whatsapp.service';
 
 
 export const ticketRouter = Router();
@@ -82,7 +82,6 @@ ticketRouter.get('/dashboard', async (req: Request, res: Response) => {
       resolvedMonth,
       allTickets,
       resolvedTicketsList,
-      locations,
     ] = await Promise.all([
       prisma.ticket.count({
         where: {
@@ -120,7 +119,6 @@ ticketRouter.get('/dashboard', async (req: Request, res: Response) => {
         },
         select: { createdAt: true, updatedAt: true },
       }),
-      prisma.location.findMany({ select: { id: true, name: true } }),
     ]);
 
     // 2. Average resolution time calculation
@@ -419,42 +417,21 @@ ticketRouter.post('/', async (req: Request, res: Response) => {
 
     broadcastTicketEvent('ticketCreated', createdTicket);
 
-    // Chamada direta para Evolution API dentro do controller
-    const whatsappUrl = process.env.WHATSAPP_API_URL || 'http://localhost:8080/message/sendText/infrafield-bot';
-    const whatsappTarget = process.env.WHATSAPP_NOTIFY_GROUP || '120363410363007862@g.us';
-    const whatsappToken = process.env.WHATSAPP_TOKEN;
-
-    const requesterName = createdTicket?.author?.name || 'Solicitante';
-    const sectorName = createdTicket?.location?.name || 'Setor não informado';
-    const categoryName = bodyCategory || createdTicket?.asset?.category || 'Outros';
-
-    const textMessage =
-      `🚨 *NOVO CHAMADO ABERTO*\n\n` +
-      `📌 *Título:* ${subject}\n` +
-      `🏷️ *Categoria:* ${categoryName}\n` +
-      `👤 *Solicitante:* ${requesterName}\n` +
-      `🏢 *Setor:* ${sectorName}\n` +
-      `⚠️ *Prioridade:* ${priority || 'MEDIA'}`;
-
-
-    axios.post(
-      whatsappUrl,
-      {
-        number: whatsappTarget,
-        text: textMessage,
-      },
-      {
-        headers: {
-          'Content-Type': 'application/json',
-          ...(whatsappToken ? { apikey: whatsappToken } : {}),
-        },
-        timeout: 5000,
-      }
-    ).then((response) => {
-    }).catch((err) => {
-      // Falha de WhatsApp nunca deve quebrar a criação do chamado
-      console.error('[TICKETS] Falha Evolution API (não crítico):', err?.response?.data || err?.message);
-    });
+    // Envia notificação para o grupo do WhatsApp usando o serviço dedicado
+    if (createdTicket) {
+      sendTicketNotification({
+        code: createdTicket.code,
+        subject: createdTicket.subject,
+        description: createdTicket.description,
+        priority: createdTicket.priority,
+        category: bodyCategory,
+        author: createdTicket.author,
+        location: createdTicket.location,
+        asset: createdTicket.asset,
+      }).catch((err) => {
+        console.error('[TICKETS] Falha ao disparar notificação do WhatsApp:', err?.message);
+      });
+    }
 
     return res.status(201).json(createdTicket);
   } catch (error) {

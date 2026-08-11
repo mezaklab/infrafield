@@ -31,6 +31,11 @@ interface UploadedFile {
   mimetype: string;
 }
 
+interface CategoryOption {
+  id: string;
+  name: string;
+}
+
 export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
   isOpen,
   onClose,
@@ -39,11 +44,13 @@ export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
   const { user } = useAuth();
   const [locations, setLocations] = useState<Location[]>([]);
   const [loadingLocations, setLoadingLocations] = useState<boolean>(true);
+  const [categories, setCategories] = useState<CategoryOption[]>([]);
+  const [loadingCategories, setLoadingCategories] = useState<boolean>(true);
 
   // Form fields
   const [subject, setSubject] = useState<string>('');
   const [description, setDescription] = useState<string>('');
-  const [category, setCategory] = useState<string>('Wi-Fi / Rede');
+  const [category, setCategory] = useState<string>('');
   const [locationId, setLocationId] = useState<string>('');
   const [assetId, setAssetId] = useState<string>('');
   const [priority, setPriority] = useState<TicketPriority>('MEDIA');
@@ -79,7 +86,28 @@ export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
       }
     };
 
+    // Fetch dynamic Categories
+    const fetchCategories = async () => {
+      try {
+        setLoadingCategories(true);
+        const res = await api.get<{ success: boolean; data: CategoryOption[] }>('/categories');
+        const list = res.data?.data || [];
+        setCategories(list);
+        if (list.length > 0) {
+          setCategory(list[0].name);
+        } else {
+          setCategory('Outros');
+        }
+      } catch (err) {
+        console.warn('Failed to load categories:', err);
+        setCategory('Outros');
+      } finally {
+        setLoadingCategories(false);
+      }
+    };
+
     fetchLocations();
+    fetchCategories();
   }, [isOpen, user]);
 
   if (!isOpen) return null;
@@ -218,7 +246,7 @@ export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
         <form onSubmit={handleSubmit} className="space-y-4 text-xs">
           {/* Setor e Categoria */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {/* Setor / Localidade (Obrigatório) */}
+            {/* Setor / Localização (Obrigatório) */}
             <div className="space-y-1.5">
               <label className="text-slate-300 font-bold flex items-center gap-1.5">
                 <Building2 className="w-4 h-4 text-cyan-400" />
@@ -233,16 +261,21 @@ export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
                   className="w-full px-3.5 py-3 rounded-xl bg-[#050811] border border-slate-800 text-white font-semibold outline-none focus:border-cyan-500 transition-colors"
                 >
                   <option value="">Selecione a Localidade / Setor *</option>
-                  {locations.map((loc) => (
-                    <option key={loc.id} value={loc.id}>
-                      {getLocationFullName(loc, locations)} {loc.room ? `(${loc.room})` : ''}
-                    </option>
-                  ))}
+                  {/* Corporate Locations */}
+                  {locations.length > 0 && (
+                    <optgroup label="Localidades Corporativas">
+                      {locations.map((loc) => (
+                        <option key={`loc-${loc.id}`} value={loc.id}>
+                          {getLocationFullName(loc, locations)} {loc.room ? `(${loc.room})` : ''}
+                        </option>
+                      ))}
+                    </optgroup>
+                  )}
                 </select>
               </div>
             </div>
 
-            {/* Categoria Simplificada */}
+            {/* Categoria Dinâmica */}
             <div className="space-y-1.5">
               <label className="text-slate-300 font-bold flex items-center gap-1.5">
                 <Laptop className="w-4 h-4 text-purple-400" />
@@ -251,15 +284,26 @@ export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
               <div className="relative">
                 <select
                   required
+                  disabled={loadingCategories}
                   value={category}
                   onChange={(e) => setCategory(e.target.value)}
                   className="w-full px-3.5 py-3 rounded-xl bg-[#050811] border border-slate-800 text-white font-semibold outline-none focus:border-cyan-500 transition-colors cursor-pointer"
                 >
-                  <option value="Wi-Fi / Rede">Wi-Fi / Rede</option>
-                  <option value="Computador">Computador</option>
-                  <option value="Impressora">Impressora</option>
-                  <option value="Periféricos">Periféricos</option>
-                  <option value="Outros">Outros</option>
+                  {categories.length > 0 ? (
+                    categories.map((cat) => (
+                      <option key={cat.id} value={cat.name}>
+                        {cat.name}
+                      </option>
+                    ))
+                  ) : (
+                    <>
+                      <option value="Wi-Fi / Rede">Wi-Fi / Rede</option>
+                      <option value="Computador">Computador</option>
+                      <option value="Impressora">Impressora</option>
+                      <option value="Periféricos">Periféricos</option>
+                      <option value="Outros">Outros</option>
+                    </>
+                  )}
                 </select>
               </div>
             </div>

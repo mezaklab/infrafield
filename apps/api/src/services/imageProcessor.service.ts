@@ -3,6 +3,8 @@ import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
 
+const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
+
 export interface ProcessImageOptions {
   whiteThreshold?: number; // 220-250 (default: 232)
 }
@@ -19,7 +21,11 @@ export async function fetchImageBuffer(imageUrl: string): Promise<Buffer | null>
     });
 
     if (!response.ok) return null;
+    const contentLength = Number(response.headers.get('content-length') || 0);
+    if (contentLength > MAX_IMAGE_BYTES) return null;
+
     const arrayBuffer = await response.arrayBuffer();
+    if (arrayBuffer.byteLength > MAX_IMAGE_BYTES) return null;
     return Buffer.from(arrayBuffer);
   } catch (err) {
     console.error(`[fetchImageBuffer] Failed to download image from ${imageUrl}:`, err);
@@ -130,6 +136,7 @@ async function removeBackgroundViaRemoveBg(imageBuffer: Buffer, apiKey: string):
       'X-Api-Key': apiKey,
     },
     body: formData,
+    signal: AbortSignal.timeout(15000),
   });
 
   if (!response.ok) {

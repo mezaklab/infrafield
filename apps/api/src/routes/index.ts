@@ -15,6 +15,9 @@ import { notificationRouter } from './notification.routes';
 import { peripheralRouter } from './peripheral.routes';
 import { ticketRouter } from './ticket.routes';
 import { adminRouter } from './admin.routes';
+import { settingsRouter, whatsappRouter } from './settings.routes';
+import { sectorRouter } from './sector.routes';
+import { categoryRouter } from './category.routes';
 import { requireAuth, requireRole } from '../middlewares/auth.middleware';
 import { Role } from '@prisma/client';
 
@@ -45,6 +48,10 @@ routes.use('/api/checklists',   requireAuth, checklistRouter);
 routes.use('/api/issues',       requireAuth, issueRouter);
 routes.use('/api/reports',      requireAuth, reportRouter);
 routes.use('/api/notifications', requireAuth, notificationRouter);
+routes.use('/api/settings',     requireAuth, requireRole([Role.SUPERADMIN, Role.ADMIN]), settingsRouter);
+routes.use('/api/sectors',      requireAuth, requireRole([Role.SUPERADMIN, Role.ADMIN]), sectorRouter);
+routes.use('/api/categories',   requireAuth, categoryRouter);
+routes.use('/api/whatsapp',     requireAuth, requireRole([Role.SUPERADMIN, Role.ADMIN]), whatsappRouter);
 
 // ─── Admin Backoffice — SUPERADMIN & ADMIN only ───────────────────────────────
 routes.use('/api/admin', requireAuth, requireRole([Role.SUPERADMIN, Role.ADMIN]), adminRouter);

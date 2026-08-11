@@ -107,7 +107,6 @@ assetRouter.post('/onboard', async (req: Request, res: Response) => {
     const { 
       hostname, 
       ipAddress, 
-      macAddress, 
       locationId, 
       type, 
       assetTag, 

@@ -12,6 +12,7 @@ import type { PeripheralsSubTab } from './components/Layout/Sidebar';
 import { Tickets } from './pages/Tickets';
 import { TicketDashboard } from './pages/TicketDashboard';
 import { OnboardStandalone } from './pages/OnboardStandalone';
+import { Settings } from './pages/Settings';
 
 import { AdminDashboard } from './pages/Admin/AdminDashboard';
 import { AdminUsers } from './pages/Admin/AdminUsers';
@@ -23,11 +24,47 @@ import { TabType, AdminTabType } from './types';
 import { QRScannerModal } from './components/Camera/QRScannerModal';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 
+const TAB_PATHS: Record<TabType, string> = {
+  dashboard: '/dashboard',
+  assets: '/assets',
+  visits: '/visits',
+  issues: '/issues',
+  peripherals: '/peripherals',
+  tickets: '/tickets',
+  'ticket-dashboard': '/tickets/dashboard',
+  settings: '/settings',
+};
+
+const getTabFromPath = (path: string): TabType => {
+  if (path.startsWith('/perifericos') || path.startsWith('/peripherals')) return 'peripherals';
+  if (path.includes('/tickets/dashboard') || path.includes('/helpdesk/dashboard') || path.startsWith('/ticket-dashboard')) return 'ticket-dashboard';
+  if (path.startsWith('/tickets') || path.startsWith('/chamados')) return 'tickets';
+  if (path.startsWith('/assets') || path.startsWith('/redes')) return 'assets';
+  if (path.startsWith('/visits') || path.startsWith('/visitas')) return 'visits';
+  if (path.startsWith('/issues') || path.startsWith('/nao-conformidades')) return 'issues';
+  if (path.startsWith('/settings') || path.startsWith('/configuracoes')) return 'settings';
+  return 'dashboard';
+};
+
+const getPeripheralSubFromPath = (path: string): PeripheralsSubTab => {
+  const subPath = path.split('/')[2]?.toUpperCase();
+  const validSubTabs: PeripheralsSubTab[] = ['TODOS', 'COMPUTADOR', 'MONITOR', 'SOFTWARE', 'REDE', 'PERIFERICO'];
+  return validSubTabs.includes(subPath as PeripheralsSubTab) ? subPath as PeripheralsSubTab : 'TODOS';
+};
+
+const getAdminTabFromPath = (path: string): AdminTabType => {
+  if (path.includes('/users')) return 'users';
+  if (path.includes('/audit-logs')) return 'audit-logs';
+  if (path.includes('/settings')) return 'settings';
+  if (path.includes('/locations')) return 'locations';
+  return 'dashboard';
+};
+
 const AppInner: React.FC = () => {
   const { isAuthenticated, isLoading, logout, isFinalUser } = useAuth();
-  const [activeTab, setActiveTab] = useState<TabType>('dashboard');
-  const [activeAdminTab, setActiveAdminTab] = useState<AdminTabType>('dashboard');
-  const [activePeripheralSub, setActivePeripheralSub] = useState<PeripheralsSubTab>('TODOS');
+  const [activeTab, setActiveTab] = useState<TabType>(() => getTabFromPath(window.location.pathname));
+  const [activeAdminTab, setActiveAdminTab] = useState<AdminTabType>(() => getAdminTabFromPath(window.location.pathname));
+  const [activePeripheralSub, setActivePeripheralSub] = useState<PeripheralsSubTab>(() => getPeripheralSubFromPath(window.location.pathname));
   const [currentPath, setCurrentPath] = useState<string>(() => window.location.pathname);
   const [refreshKey, setRefreshKey] = useState<number>(0);
   const [isGlobalScannerOpen, setIsGlobalScannerOpen] = useState<boolean>(false);
@@ -48,7 +85,7 @@ const AppInner: React.FC = () => {
 
     if (isFinalUser) {
       setActiveTab('tickets');
-      if (currentPath.startsWith('/admin') || currentPath !== '/tickets') {
+      if (currentPath.startsWith('/admin') || !currentPath.startsWith('/tickets')) {
         if (window.location.pathname !== '/tickets') {
           window.history.replaceState({}, '', '/tickets');
         }
@@ -58,25 +95,13 @@ const AppInner: React.FC = () => {
     }
 
     if (currentPath.startsWith('/admin')) {
-      if (currentPath.includes('/users')) setActiveAdminTab('users');
-      else if (currentPath.includes('/audit-logs')) setActiveAdminTab('audit-logs');
-      else if (currentPath.includes('/settings')) setActiveAdminTab('settings');
-      else if (currentPath.includes('/locations')) setActiveAdminTab('locations');
-      else setActiveAdminTab('dashboard');
-    } else if (currentPath.startsWith('/perifericos') || currentPath.startsWith('/peripherals')) {
-      setActiveTab('peripherals');
-    } else if (currentPath.includes('/tickets/dashboard') || currentPath.includes('/helpdesk/dashboard')) {
-      setActiveTab('ticket-dashboard');
-    } else if (currentPath.startsWith('/tickets') || currentPath.startsWith('/chamados')) {
-      setActiveTab('tickets');
-    } else if (currentPath.startsWith('/assets') || currentPath.startsWith('/redes')) {
-      setActiveTab('assets');
-    } else if (currentPath.startsWith('/visits') || currentPath.startsWith('/visitas')) {
-      setActiveTab('visits');
-    } else if (currentPath.startsWith('/issues') || currentPath.startsWith('/nao-conformidades')) {
-      setActiveTab('issues');
-    } else if (currentPath === '/' || currentPath === '/dashboard') {
-      setActiveTab('dashboard');
+      setActiveAdminTab(getAdminTabFromPath(currentPath));
+    } else {
+      const tab = getTabFromPath(currentPath);
+      setActiveTab(tab);
+      if (tab === 'peripherals') {
+        setActivePeripheralSub(getPeripheralSubFromPath(currentPath));
+      }
     }
   }, [currentPath, isFinalUser, isLoading]);
 
@@ -87,10 +112,19 @@ const AppInner: React.FC = () => {
     setCurrentPath(path);
   };
 
+  const navigateToTab = (tab: TabType) => {
+    setActiveTab(tab);
+    navigateToPath(TAB_PATHS[tab]);
+  };
+
+  const navigateToPeripheralSub = (sub: PeripheralsSubTab) => {
+    setActivePeripheralSub(sub);
+    navigateToPath(sub === 'TODOS' ? TAB_PATHS.peripherals : `${TAB_PATHS.peripherals}/${sub.toLowerCase()}`);
+  };
+
   const handleGlobalScan = (scannedCode: string) => {
     alert(`🔍 QR Code Lido Globalmente: ${scannedCode}. Redirecionando para o catálogo de ativos...`);
-    setActiveTab('assets');
-    navigateToPath('/assets');
+    navigateToTab('assets');
   };
 
   // Dedicated Isolated Route: /onboard or /onboarding (No Layout, No Sidebar)
@@ -142,28 +176,28 @@ const AppInner: React.FC = () => {
     <AppLayout
       activeTab={activeTab}
       setActiveTab={(tab) => {
-        setActiveTab(tab);
-        navigateToPath(`/${tab}`);
+        navigateToTab(tab);
       }}
       onLogout={logout}
       onRefresh={() => setRefreshKey((prev) => prev + 1)}
       onOpenScanner={() => setIsGlobalScannerOpen(true)}
       onNavigateToAdmin={() => navigateToPath('/admin/dashboard')}
       activePeripheralSub={activePeripheralSub}
-      setActivePeripheralSub={setActivePeripheralSub}
+      setActivePeripheralSub={navigateToPeripheralSub}
       onOpenCreateTicket={() => {
-        setActiveTab('tickets');
+        navigateToTab('tickets');
         setIsCreateTicketModalOpen(true);
       }}
     >
       <div key={refreshKey}>
-        {activeTab === 'dashboard'        && <Dashboard onNavigate={(tab) => setActiveTab(tab)} />}
-        {activeTab === 'ticket-dashboard' && <TicketDashboard onNavigateToTickets={() => { setActiveTab('tickets'); navigateToPath('/tickets'); }} />}
+        {activeTab === 'dashboard'        && <Dashboard onNavigate={navigateToTab} />}
+        {activeTab === 'ticket-dashboard' && <TicketDashboard onNavigateToTickets={() => navigateToTab('tickets')} />}
         {activeTab === 'tickets'          && <Tickets isCreateOpen={isCreateTicketModalOpen} onCloseCreateModal={() => setIsCreateTicketModalOpen(false)} />}
         {activeTab === 'assets'           && <Assets />}
         {activeTab === 'visits'           && <Visits />}
         {activeTab === 'issues'           && <Issues />}
-        {activeTab === 'peripherals'      && <Peripherals key={`peripherals-${activePeripheralSub}`} defaultSubTab={activePeripheralSub} onSubTabChange={setActivePeripheralSub} />}
+        {activeTab === 'peripherals'      && <Peripherals key={`peripherals-${activePeripheralSub}`} defaultSubTab={activePeripheralSub} onSubTabChange={navigateToPeripheralSub} />}
+        {activeTab === 'settings'         && <Settings />}
       </div>
 
       {/* Global QR Code / Camera Scanner Modal */}

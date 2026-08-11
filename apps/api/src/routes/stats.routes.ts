@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../lib/prisma';
-import { AssetStatus, VisitStatus, IssueSeverity, Prisma } from '@prisma/client';
+import { AssetStatus, VisitStatus, IssueSeverity } from '@prisma/client';
 
 export const statsRouter = Router();
 

@@ -18,7 +18,8 @@ import {
   Printer,
   Wifi,
   Layers,
-  HardDrive
+  HardDrive,
+  Settings as SettingsIcon
 } from 'lucide-react';
 import { TabType } from '../../types';
 import { useAuth } from '../../contexts/AuthContext';
@@ -56,6 +57,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const { user, isSuperAdmin, isFinalUser } = useAuth();
   const hasAdminRole = user?.role === 'SUPERADMIN' || user?.role === 'ADMIN';
   const [isPeripheralExpanded, setIsPeripheralExpanded] = useState(activeTab === 'peripherals');
+  const currentPath = window.location.pathname;
 
   const mainNavItems = [
     { id: 'dashboard' as TabType, label: 'Dashboard NOC', icon: LayoutDashboard },
@@ -175,7 +177,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <div className="space-y-1">
             {helpdeskNavItems.map((item) => {
               const Icon = item.icon;
-              const isActive = activeTab === item.id;
+              const isTicketsPath =
+                (currentPath === '/tickets' || currentPath.startsWith('/tickets/')) &&
+                !currentPath.startsWith('/tickets/dashboard');
+              const isTicketDashboardPath =
+                currentPath.startsWith('/tickets/dashboard') ||
+                currentPath.startsWith('/helpdesk/dashboard') ||
+                currentPath.startsWith('/ticket-dashboard');
+              const isActive = item.id === 'tickets'
+                ? isTicketsPath
+                : item.id === 'ticket-dashboard'
+                  ? isTicketDashboardPath
+                  : activeTab === item.id;
               return (
                 <button
                   key={item.id}
@@ -203,6 +216,21 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <PlusCircle className="w-4 h-4 shrink-0 text-[#00f2fe] group-hover:rotate-90 transition-transform" />
               <span>{isFinalUser ? 'Abrir Novo Chamado' : 'Novo Chamado'}</span>
             </button>
+
+            {/* Configurações (para administradores) — último item do Helpdesk */}
+            {hasAdminRole && (
+              <button
+                onClick={() => setActiveTab('settings')}
+                className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-medium text-xs transition-all duration-200 ${
+                  activeTab === 'settings'
+                    ? 'bg-gradient-to-r from-cyan-500/20 to-blue-500/15 text-[#00f2fe] border border-cyan-500/40 shadow-md shadow-cyan-500/10'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+                }`}
+              >
+                <SettingsIcon className={`w-4 h-4 shrink-0 transition-transform ${activeTab === 'settings' ? 'scale-110 text-[#00f2fe]' : ''}`} />
+                <span className="truncate whitespace-nowrap">Configurações</span>
+              </button>
+            )}
           </div>
         </div>
 

@@ -1,8 +1,9 @@
 import http from 'http';
 import dotenv from 'dotenv';
 import { createApp } from './app';
-import { startNetworkPoller } from './services/networkPoller.service';
+import { startNetworkPoller, stopNetworkPoller } from './services/networkPoller.service';
 import { initWebSocketServer } from './services/websocket.service';
+import { prisma } from './lib/prisma';
 
 dotenv.config();
 
@@ -11,7 +12,7 @@ const app = createApp();
 const server = http.createServer(app);
 
 // Inicializa o servidor WebSocket (Socket.io)
-initWebSocketServer(server);
+const io = initWebSocketServer(server);
 
 server.listen(PORT, () => {
   console.log(`🚀 InfraField API Server running on port ${PORT}`);
@@ -22,4 +23,22 @@ server.listen(PORT, () => {
   startNetworkPoller(60000);
 });
 
+let shuttingDown = false;
 
+async function shutdown(signal: string): Promise<void> {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  console.log(`[API] Encerramento solicitado por ${signal}.`);
+
+  stopNetworkPoller();
+  io.close();
+  server.close(async () => {
+    await prisma.$disconnect();
+    process.exit(0);
+  });
+
+  setTimeout(() => process.exit(1), 10_000).unref();
+}
+
+process.once('SIGINT', () => void shutdown('SIGINT'));
+process.once('SIGTERM', () => void shutdown('SIGTERM'));

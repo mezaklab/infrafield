@@ -4,7 +4,7 @@ import { prisma } from '../lib/prisma';
 export const notificationRouter = Router();
 
 // GET /api/notifications - List notifications
-notificationRouter.get('/', async (req: Request, res: Response) => {
+notificationRouter.get('/', async (_req: Request, res: Response) => {
   try {
     const notifications = await prisma.notification.findMany({
       orderBy: { createdAt: 'desc' },
@@ -19,7 +19,7 @@ notificationRouter.get('/', async (req: Request, res: Response) => {
 });
 
 // PATCH /api/notifications/mark-as-read - Mark all unread notifications as read
-notificationRouter.patch('/mark-as-read', async (req: Request, res: Response) => {
+notificationRouter.patch('/mark-as-read', async (_req: Request, res: Response) => {
   try {
     await prisma.notification.updateMany({
       where: { isRead: false },

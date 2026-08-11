@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { prisma } from '../lib/prisma';
 
 export interface TicketNotificationData {
   code: string;
@@ -21,61 +22,184 @@ export interface TicketNotificationData {
   } | null;
 }
 
+const EVOLUTION_FALLBACK_URLS = [
+  'http://localhost:8080',
+  'http://127.0.0.1:8080',
+  'http://infrafield-evolution:8080',
+  'http://evolution-api:8080',
+] as const;
+
+function normalizeBaseUrl(rawUrl: string): string | null {
+  try {
+    return new URL(rawUrl).origin.replace(/\/+$/, '');
+  } catch {
+    console.warn(`[WhatsApp Service] URL da Evolution ignorada por ser invalida: ${rawUrl}`);
+    return null;
+  }
+}
+
+export function getEvolutionCandidateUrls(): string[] {
+  const configuredUrls = [
+    process.env.EVOLUTION_API_URL,
+    process.env.WHATSAPP_API_URL,
+  ].filter((url): url is string => Boolean(url));
+
+  return Array.from(
+    new Set(
+      [...configuredUrls, ...EVOLUTION_FALLBACK_URLS]
+        .map(normalizeBaseUrl)
+        .filter((url): url is string => Boolean(url)),
+    ),
+  );
+}
+
+function getEvolutionConfig() {
+  const instance =
+    process.env.EVOLUTION_INSTANCE_NAME ||
+    process.env.EVOLUTION_INSTANCE ||
+    'infrafield';
+  const apiKey =
+    process.env.EVOLUTION_API_KEY ||
+    process.env.WHATSAPP_TOKEN ||
+    'infrafield_secret_key';
+  return { instance, apiKey };
+}
+
 /**
- * Envia notificação formatada de um chamado para o WhatsApp via API/Webhook.
+ * Monta os headers padrão para todas as requisições à Evolution API v2.
+ */
+function evolutionHeaders(apiKey: string): Record<string, string> {
+  return {
+    'Content-Type': 'application/json',
+    ...(apiKey ? { apikey: apiKey } : {}),
+  };
+}
+
+export interface WhatsAppSendResult {
+  baseUrl: string;
+  data: unknown;
+}
+
+const PRIORITY_PRESENTATION: Record<string, { emoji: string; label: string }> = {
+  CRITICA: { emoji: '🔴', label: 'Crítica' },
+  ALTA: { emoji: '⚠️', label: 'Alta' },
+  MEDIA: { emoji: '🟠', label: 'Média' },
+  BAIXA: { emoji: '🟢', label: 'Baixa' },
+};
+
+function getPriorityPresentation(priority?: string): { emoji: string; label: string } {
+  const normalizedPriority = priority?.trim().toUpperCase() || 'MEDIA';
+  return PRIORITY_PRESENTATION[normalizedPriority] || {
+    emoji: '⚠️',
+    label: priority?.trim() || 'Média',
+  };
+}
+
+async function findReachableEvolutionUrl(): Promise<string> {
+  const { instance, apiKey } = getEvolutionConfig();
+  const candidateUrls = getEvolutionCandidateUrls();
+  let lastError: unknown;
+
+  for (const baseUrl of candidateUrls) {
+    const statusEndpoint = `${baseUrl}/instance/connectionState/${encodeURIComponent(instance)}`;
+
+    try {
+      const response = await axios.get(statusEndpoint, {
+        headers: evolutionHeaders(apiKey),
+        timeout: 3000,
+      });
+      const state = String(response.data?.instance?.state || response.data?.state || '').toLowerCase();
+      console.log(`[WhatsApp Service] Evolution API encontrada em ${baseUrl}; instancia '${instance}': ${state || 'desconhecido'}`);
+
+      if (state !== 'open' && state !== 'connected') {
+        throw new Error(`A instancia WhatsApp '${instance}' esta '${state || 'desconhecida'}'. Reconecte pelo QR Code.`);
+      }
+      return baseUrl;
+    } catch (error: any) {
+      // Uma resposta HTTP prova que a URL esta correta. Nao tente aliases do
+      // mesmo servidor nem esconda erros de autenticacao/estado da instancia.
+      if (error?.response) {
+        throw error;
+      }
+      if (error instanceof Error && error.message.includes('Reconecte pelo QR Code')) {
+        throw error;
+      }
+      lastError = error;
+      console.warn(`[WhatsApp Service] Evolution indisponivel em ${baseUrl}: ${error?.message}`);
+    }
+  }
+
+  const error: any = lastError;
+  const detail = error?.message || 'nenhuma URL candidata disponivel';
+  throw new Error(`Todas as URLs da Evolution API falharam. Ultimo erro: ${detail}`);
+}
+
+/** Envio unico e resiliente usado por todos os fluxos da aplicacao. */
+export async function sendWhatsAppText(groupJid: string, text: string): Promise<WhatsAppSendResult> {
+  const normalizedJid = groupJid.trim();
+  if (!normalizedJid.endsWith('@g.us')) {
+    throw new Error(`JID de grupo WhatsApp invalido: ${normalizedJid || '(vazio)'}`);
+  }
+
+  const { instance, apiKey } = getEvolutionConfig();
+  const baseUrl = await findReachableEvolutionUrl();
+  const endpoint = `${baseUrl}/message/sendText/${encodeURIComponent(instance)}`;
+  console.log(`[WhatsApp Service] Enviando uma unica vez via ${endpoint} para ${normalizedJid}`);
+
+  const response = await axios.post(
+    endpoint,
+    { number: normalizedJid, text },
+    { headers: evolutionHeaders(apiKey), timeout: 8000 },
+  );
+  console.log(`[WhatsApp Service] Mensagem aceita pela Evolution API em ${baseUrl}`);
+  return { baseUrl, data: response.data };
+}
+
+/**
+ * Envia notificação formatada de um chamado para um grupo do WhatsApp
+ * via Evolution API v2.
  *
- * Configurações esperadas no .env:
- * - WHATSAPP_API_URL: Endpoint do webhook/gateway WhatsApp (ex: https://api.whatsapp.com/send ou gateway local)
- * - WHATSAPP_TOKEN: Bearer token / API Key para autenticação na gateway
- * - WHATSAPP_NOTIFY_GROUP: Número de telefone ou ID do grupo de destino
+ * Rotas Evolution API v2:
+ *   Envio de mensagem: POST /message/sendText/{instanceName}
+ *     body: { number: "<groupId>", text: "<mensagem>" }
+ *
+ * O `whatsapp_group_id` é buscado da tabela `Settings` do banco de dados.
  */
 export async function sendTicketNotification(ticketData: TicketNotificationData): Promise<void> {
-  const apiUrl = process.env.WHATSAPP_API_URL;
-  const token = process.env.WHATSAPP_TOKEN;
-  const notifyTarget = process.env.WHATSAPP_NOTIFY_GROUP;
+  const settings = await prisma.settings.findFirst();
+  const targetJid = settings?.whatsapp_group_id || process.env.WHATSAPP_NOTIFY_GROUP;
 
-  // Se a URL ou o destino não estiverem configurados, loga apenas em modo de desenvolvimento
-  if (!apiUrl || !notifyTarget) {
-    console.log(`[WhatsApp Service] Notificação para chamado ${ticketData.code} ignorada (WHATSAPP_API_URL ou WHATSAPP_NOTIFY_GROUP não configurado no .env).`);
+  if (!targetJid) {
+    console.error("\x1b[31mERRO: Nenhum grupo de WhatsApp configurado no banco.\x1b[0m");
     return;
   }
 
   const requesterName = ticketData.author?.name || 'Solicitante não identificado';
-  const sectorName = ticketData.location?.name || (ticketData.location ? [ticketData.location.name, ticketData.location.building, ticketData.location.room].filter(Boolean).join(' - ') : 'Setor não informado');
-  const categoryName = ticketData.category || ticketData.asset?.category || ticketData.asset?.name || 'Outros';
+  const categoryName = ticketData.category || ticketData.asset?.category || 'Outros';
+  const sectorName =
+    ticketData.location?.name ||
+    (ticketData.location
+      ? [ticketData.location.name, ticketData.location.building, ticketData.location.room]
+          .filter(Boolean)
+          .join(' - ')
+      : 'Não informado');
 
-  const formattedMessage =
-    `🚨 *NOVO CHAMADO ABERTO*\n\n` +
-    `📌 *Título:* ${ticketData.subject}\n` +
-    `🏷️ *Categoria:* ${categoryName}\n` +
-    `👤 *Solicitante:* ${requesterName}\n` +
-    `🏢 *Setor:* ${sectorName}\n` +
-    `⚠️ *Prioridade:* ${ticketData.priority || 'MEDIA'}`;
+  const priority = getPriorityPresentation(ticketData.priority);
+  const dashboardUrl = (process.env.WEB_APP_URL || process.env.FRONTEND_URL || 'http://localhost:5173')
+    .replace(/\/+$/, '');
 
-  try {
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-    };
+  const formattedMessage = [
+    `🚨 *NOVO CHAMADO ABERTO*`,
+    ``,
+    `📌 *Título:* ${ticketData.subject}`,
+    `🏷️ *Categoria:* ${categoryName}`,
+    `👤 *Solicitante:* ${requesterName}`,
+    `🏢 *Setor:* ${sectorName}`,
+    `${priority.emoji} *Prioridade:* ${priority.label}`,
+    ``,
+    `🔗 *Acessar chamado:*`,
+    `${dashboardUrl}/tickets/${ticketData.code}`,
+  ].join('\n');
 
-    if (token) {
-      headers['apikey'] = token;
-    }
-
-    await axios.post(
-      apiUrl,
-      {
-        number: notifyTarget,
-        text: formattedMessage,
-      },
-      {
-        headers,
-        timeout: 5000, // Timeout de 5 segundos para não atrasar retentativas
-      }
-    );
-
-    console.log(`[WhatsApp Service] Notificação enviada com sucesso para o chamado ${ticketData.code}.`);
-  } catch (error: any) {
-    // Log amigável sem quebrar o fluxo chamador
-    console.error(`[WhatsApp Service] Erro ao enviar notificação do chamado ${ticketData.code}:`, error?.message || error);
-  }
+  await sendWhatsAppText(targetJid, formattedMessage);
 }

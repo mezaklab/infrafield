@@ -11,6 +11,8 @@ services:
       - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    networks:
+      - infrafield-net
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-infrafield_user} -d ${POSTGRES_DB:-infrafield_db}"]
       interval: 10s
@@ -29,7 +31,14 @@ services:
       AUTHENTICATION_API_KEY: ${WHATSAPP_TOKEN:-infrafield_secret_key}
       AUTHENTICATION_EXPOSE_IN_FETCH_INSTANCES: "true"
       # Armazenamento de sessão WhatsApp (persistência entre restarts)
-      DATABASE_ENABLED: "false"
+      DATABASE_ENABLED: "true"
+      DATABASE_PROVIDER: "postgresql"
+      DATABASE_CONNECTION_URI: "postgresql://infrafield_user:infrafield_password@infrafield-postgres:5432/infrafield_db?schema=public"
+      # Esta instalacao nao possui Redis. O default da Evolution v2 tenta
+      # localhost:6379 continuamente e bloqueia/atrasa o envio de mensagens.
+      CACHE_REDIS_ENABLED: "false"
+      CACHE_REDIS_SAVE_INSTANCES: "false"
+      CACHE_LOCAL_ENABLED: "true"
       STORE_MESSAGES: "true"
       STORE_MESSAGE_UP: "true"
       STORE_CONTACTS: "true"
@@ -40,6 +49,8 @@ services:
     volumes:
       - evolution_instances:/evolution/instances
       - evolution_store:/evolution/store
+    networks:
+      - infrafield-net
     depends_on:
       postgres:
         condition: service_healthy
@@ -52,6 +63,8 @@ services:
       - "80:80"
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    networks:
+      - infrafield-net
     depends_on:
       - postgres
 
@@ -59,3 +72,7 @@ volumes:
   postgres_data:
   evolution_instances:
   evolution_store:
+
+networks:
+  infrafield-net:
+    driver: bridge

@@ -121,17 +121,17 @@ model Company {
 }
 
 model Location {
-  id        String   @id @default(uuid())
+  id        String  @id @default(uuid())
   name      String
   building  String?
   floor     String?
   room      String?
   companyId String
-  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
-  parentId  String?    @map("parent_id")
-  parent    Location?  @relation("LocationHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
-  children  Location[] @relation("LocationHierarchy")
+  parentId String?    @map("parent_id")
+  parent   Location?  @relation("LocationHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
+  children Location[] @relation("LocationHierarchy")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -147,14 +147,14 @@ model Location {
 }
 
 model User {
-  id        String   @id @default(uuid())
+  id        String  @id @default(uuid())
   name      String
-  email     String   @unique
-  username  String?  @unique
+  email     String  @unique
+  username  String? @unique
   password  String
-  role      Role     @default(TECHNICIAN)
+  role      Role    @default(TECHNICIAN)
   companyId String
-  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
   locationId String?
   location   Location? @relation(fields: [locationId], references: [id], onDelete: SetNull)
@@ -162,13 +162,13 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  assets           Asset[]
-  peripherals      Peripheral[]
-  visits           Visit[]
-  reportedIssues   Issue[]
-  authoredTickets  Ticket[]        @relation("TicketAuthor")
-  assignedTickets  Ticket[]        @relation("TicketTechnician")
-  ticketMessages   TicketMessage[]
+  assets          Asset[]
+  peripherals     Peripheral[]
+  visits          Visit[]
+  reportedIssues  Issue[]
+  authoredTickets Ticket[]        @relation("TicketAuthor")
+  assignedTickets Ticket[]        @relation("TicketTechnician")
+  ticketMessages  TicketMessage[]
 
   @@map("users")
 }
@@ -177,16 +177,16 @@ model Asset {
   id            String      @id @default(uuid())
   name          String
   code          String      @unique
-  assetTag      String?     // Patrimônio
+  assetTag      String? // Patrimônio
   ownershipType String?     @default("PROPRIO") // Tipo de Patrimônio: 'PROPRIO' | 'LOCADO'
   rentalCompany String?     @map("rental_company") // Empresa Locadora
   serialNumber  String?
-  hostname     String?
-  ipAddress    String?
-  category     String
-  status       AssetStatus @default(OPERATIONAL)
-  imageUrl     String?
-  wifiBands    String?     // Frequência e Banda Wi-Fi (Ex: '2.4GHz / 5GHz')
+  hostname      String?
+  ipAddress     String?
+  category      String
+  status        AssetStatus @default(OPERATIONAL)
+  imageUrl      String?
+  wifiBands     String? // Frequência e Banda Wi-Fi (Ex: '2.4GHz / 5GHz')
 
   locationId String?
   location   Location? @relation(fields: [locationId], references: [id], onDelete: SetNull)
@@ -273,14 +273,14 @@ model ChecklistTemplate {
 }
 
 model ChecklistItem {
-  id          String             @id @default(uuid())
-  templateId  String
-  template    ChecklistTemplate  @relation(fields: [templateId], references: [id], onDelete: Cascade)
-  label       String
-  fieldType   ChecklistFieldType @default(YES_NO)
-  isRequired  Boolean            @default(false)
-  options     String?            // JSON string array for SELECT options
-  order       Int                @default(0)
+  id         String             @id @default(uuid())
+  templateId String
+  template   ChecklistTemplate  @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  label      String
+  fieldType  ChecklistFieldType @default(YES_NO)
+  isRequired Boolean            @default(false)
+  options    String? // JSON string array for SELECT options
+  order      Int                @default(0)
 
   responses ChecklistResponse[]
 
@@ -354,7 +354,7 @@ model Peripheral {
   id             String                 @id @default(uuid())
   name           String
   code           String                 @unique
-  assetTag       String?                // Patrimônio
+  assetTag       String? // Patrimônio
   ownershipType  String?                @default("PROPRIO") // Tipo de Patrimônio: 'PROPRIO' | 'LOCADO'
   rentalCompany  String?                @map("rental_company") // Empresa Locadora
   serialNumber   String?
@@ -362,8 +362,8 @@ model Peripheral {
   subcategory    PeripheralSubcategory? // DESKTOP ou NOTEBOOK (quando category == COMPUTADOR)
   brand          String?
   model          String?
-  ipAddress      String?                // Endereço IP para monitoramento via Poller (ICMP Ping)
-  specifications String?                // Especificações técnicas / Observações
+  ipAddress      String? // Endereço IP para monitoramento via Poller (ICMP Ping)
+  specifications String? // Especificações técnicas / Observações
   status         AssetStatus            @default(OPERATIONAL)
   imageUrl       String?
 
@@ -451,4 +451,31 @@ model TicketMessage {
   @@map("ticket_messages")
 }
 
+model Settings {
+  id                  String   @id @default(uuid())
+  whatsapp_group_id   String?
+  whatsapp_group_name String?
+  whatsapp_status     String?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
 
+  @@map("settings")
+}
+
+model Sector {
+  id        String   @id @default(uuid())
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("sectors")
+}
+
+model Category {
+  id        String   @id @default(uuid())
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("categories")
+}
