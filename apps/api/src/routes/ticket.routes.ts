@@ -1,8 +1,10 @@
 import { Router, Request, Response } from 'express';
 import { z } from 'zod';
 import { TicketStatus, TicketPriority, Role } from '@prisma/client';
+import axios from 'axios';
 import { prisma } from '../lib/prisma';
 import { getIO } from '../services/websocket.service';
+
 
 export const ticketRouter = Router();
 
@@ -10,7 +12,8 @@ export const ticketRouter = Router();
 const CreateTicketSchema = z.object({
   subject: z.string().min(3, 'Assunto é obrigatório'),
   description: z.string().min(5, 'Descrição detalhada é obrigatória'),
-  locationId: z.string().optional().nullable(),
+  category: z.string().optional().default('Outros'),
+  locationId: z.string().min(1, 'Setor / Localização é obrigatório'),
   assetId: z.string().optional().nullable(),
   priority: z.nativeEnum(TicketPriority).optional().default(TicketPriority.MEDIA),
   attachments: z.array(z.string()).optional(),
@@ -343,11 +346,11 @@ ticketRouter.post('/', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Dados inválidos', details: parsed.error.format() });
     }
 
-    const { subject, description, locationId: bodyLocationId, assetId, priority, attachments } = parsed.data;
+    const { subject, description, category: bodyCategory, locationId: bodyLocationId, assetId, priority, attachments } = parsed.data;
     const authorId = req.user!.userId;
 
     // Resolve locationId: body parameter or user's assigned location
-    let targetLocationId = bodyLocationId;
+    let targetLocationId: string | null = bodyLocationId;
     if (!targetLocationId) {
       const user = await prisma.user.findUnique({
         where: { id: authorId },
@@ -415,6 +418,43 @@ ticketRouter.post('/', async (req: Request, res: Response) => {
     });
 
     broadcastTicketEvent('ticketCreated', createdTicket);
+
+    // Chamada direta para Evolution API dentro do controller
+    const whatsappUrl = process.env.WHATSAPP_API_URL || 'http://localhost:8080/message/sendText/infrafield-bot';
+    const whatsappTarget = process.env.WHATSAPP_NOTIFY_GROUP || '120363410363007862@g.us';
+    const whatsappToken = process.env.WHATSAPP_TOKEN;
+
+    const requesterName = createdTicket?.author?.name || 'Solicitante';
+    const sectorName = createdTicket?.location?.name || 'Setor não informado';
+    const categoryName = bodyCategory || createdTicket?.asset?.category || 'Outros';
+
+    const textMessage =
+      `🚨 *NOVO CHAMADO ABERTO*\n\n` +
+      `📌 *Título:* ${subject}\n` +
+      `🏷️ *Categoria:* ${categoryName}\n` +
+      `👤 *Solicitante:* ${requesterName}\n` +
+      `🏢 *Setor:* ${sectorName}\n` +
+      `⚠️ *Prioridade:* ${priority || 'MEDIA'}`;
+
+
+    axios.post(
+      whatsappUrl,
+      {
+        number: whatsappTarget,
+        text: textMessage,
+      },
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          ...(whatsappToken ? { apikey: whatsappToken } : {}),
+        },
+        timeout: 5000,
+      }
+    ).then((response) => {
+    }).catch((err) => {
+      // Falha de WhatsApp nunca deve quebrar a criação do chamado
+      console.error('[TICKETS] Falha Evolution API (não crítico):', err?.response?.data || err?.message);
+    });
 
     return res.status(201).json(createdTicket);
   } catch (error) {

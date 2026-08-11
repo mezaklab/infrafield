@@ -235,12 +235,14 @@ reportRouter.get('/inventory/pdf', async (_req: Request, res: Response) => {
     // Table Header
     let tableY = doc.y;
     doc.rect(40, tableY, 515, 20).fillAndStroke('#0f172a', '#0f172a');
-    doc.fillColor('#ffffff').fontSize(8).font('Helvetica-Bold');
-    doc.text('Código', 48, tableY + 6);
-    doc.text('Nome do Equipamento', 110, tableY + 6);
-    doc.text('Patrimônio', 270, tableY + 6);
-    doc.text('Hostname / IP', 340, tableY + 6);
-    doc.text('Status', 475, tableY + 6);
+    doc.fillColor('#ffffff').fontSize(7.5).font('Helvetica-Bold');
+    doc.text('Código', 45, tableY + 6);
+    doc.text('Nome do Equipamento', 98, tableY + 6);
+    doc.text('Patrimônio', 198, tableY + 6);
+    doc.text('Propriedade', 252, tableY + 6);
+    doc.text('Localização', 338, tableY + 6);
+    doc.text('Hostname / IP', 425, tableY + 6);
+    doc.text('Status', 505, tableY + 6);
 
     tableY += 20;
 
@@ -253,13 +255,24 @@ reportRouter.get('/inventory/pdf', async (_req: Request, res: Response) => {
       const bg = idx % 2 === 0 ? '#f8fafc' : '#ffffff';
       doc.rect(40, tableY, 515, 22).fillAndStroke(bg, '#e2e8f0');
 
-      doc.fillColor('#0284c7').fontSize(8).font('Helvetica-Bold').text(asset.code, 48, tableY + 6, { width: 55 });
-      doc.fillColor('#334155').font('Helvetica').text(asset.name, 110, tableY + 6, { width: 155, height: 14 });
-      doc.text(asset.assetTag || 'N/A', 270, tableY + 6, { width: 65 });
-      doc.fillColor('#0369a1').font('Helvetica-Bold').text(asset.ipAddress || asset.hostname || 'N/A', 340, tableY + 6, { width: 130 });
+      // Formatação do tipo de propriedade e fornecedor (locadora)
+      let ownershipText = 'Próprio';
+      if (asset.ownershipType === 'LOCADO' || asset.ownership_type === 'LOCADO') {
+        const vendor = asset.rentalCompany || asset.rental_company;
+        ownershipText = vendor ? `Locado — ${vendor}` : 'Locado';
+      }
+
+      const locationName = asset.location?.name || '-';
+
+      doc.fillColor('#0284c7').fontSize(7).font('Helvetica-Bold').text(asset.code, 45, tableY + 6, { width: 50 });
+      doc.fillColor('#334155').font('Helvetica').text(asset.name, 98, tableY + 6, { width: 96, height: 14 });
+      doc.text(asset.assetTag || 'N/A', 198, tableY + 6, { width: 50 });
+      doc.fillColor('#475569').text(ownershipText, 252, tableY + 6, { width: 82, height: 14 });
+      doc.fillColor('#334155').font('Helvetica').text(locationName, 338, tableY + 6, { width: 82, height: 14 });
+      doc.fillColor('#0369a1').font('Helvetica-Bold').text(asset.ipAddress || asset.hostname || 'N/A', 425, tableY + 6, { width: 76 });
 
       const isOp = asset.status === 'OPERATIONAL';
-      doc.fillColor(isOp ? '#16a34a' : '#d97706').text(asset.status, 475, tableY + 6, { width: 75 });
+      doc.fillColor(isOp ? '#16a34a' : '#d97706').font('Helvetica-Bold').text(asset.status, 505, tableY + 6, { width: 48 });
 
       tableY += 22;
     });

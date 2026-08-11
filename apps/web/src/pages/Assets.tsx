@@ -18,8 +18,6 @@ import {
   Wifi,
   Cpu,
   Activity,
-  FileText,
-  Download,
   Edit3,
   Trash2,
   Monitor,
@@ -29,6 +27,7 @@ import { Asset, Location } from '../types';
 import { getAssets, createAsset, updateAsset, deleteAsset, getLocations, downloadInventoryPDFReport, exportAssetsCSV } from '../services/api';
 import { getSocket, StatusUpdatedPayload } from '../services/socket';
 import { getLocationFullName } from '../utils/location';
+import { ExportDropdown } from '../components/Layout/ExportDropdown';
 
 /**
  * Mapeamento MOCADO COM PNGs REAIS DE VERDADE com Fundo Transparente.
@@ -433,25 +432,25 @@ export const Assets: React.FC = () => {
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
           </button>
 
-          {/* Export CSV Button */}
-          <button
-            onClick={exportAssetsCSV}
-            className="flex items-center gap-1.5 bg-[#080d1a] hover:bg-slate-800 border border-slate-800 text-slate-200 text-xs font-semibold px-3 py-2.5 rounded-xl transition-all"
-            title="Exportar Inventário em CSV"
-          >
-            <Download className="w-4 h-4 text-emerald-400" />
-            <span>Exportar CSV</span>
-          </button>
-
-          {/* Download Inventory PDF Report */}
-          <button
-            onClick={downloadInventoryPDFReport}
-            className="flex items-center gap-1.5 bg-[#080d1a] hover:bg-slate-800 border border-slate-800 text-slate-200 text-xs font-semibold px-3 py-2.5 rounded-xl transition-all"
-            title="Gerar PDF de Inventário Geral"
-          >
-            <FileText className="w-4 h-4 text-[#00f2fe]" />
-            <span>Inventário PDF</span>
-          </button>
+          {/* Reusable Export Dropdown */}
+          <ExportDropdown
+            options={[
+              {
+                id: 'csv-assets',
+                label: 'Exportar Inventário de Redes (CSV)',
+                sublabel: 'Download em planilha CSV',
+                type: 'csv',
+                onExport: exportAssetsCSV,
+              },
+              {
+                id: 'pdf-assets',
+                label: 'Relatório de Inventário (PDF)',
+                sublabel: 'Documento oficial formatado',
+                type: 'pdf',
+                onExport: downloadInventoryPDFReport,
+              },
+            ]}
+          />
 
           <button
             onClick={handleOpenCreateModal}

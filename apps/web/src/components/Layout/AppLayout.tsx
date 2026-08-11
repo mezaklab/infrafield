@@ -3,6 +3,7 @@ import { Sidebar } from './Sidebar';
 import { BottomNav } from './BottomNav';
 import { Header } from './Header';
 import { TabType } from '../../types';
+import type { PeripheralsSubTab } from './Sidebar';
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -13,6 +14,8 @@ interface AppLayoutProps {
   onOpenScanner?: () => void;
   onNavigateToAdmin?: () => void;
   onOpenCreateTicket?: () => void;
+  activePeripheralSub?: PeripheralsSubTab;
+  setActivePeripheralSub?: (sub: PeripheralsSubTab) => void;
 }
 
 export const AppLayout: React.FC<AppLayoutProps> = ({
@@ -24,6 +27,8 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
   onOpenScanner,
   onNavigateToAdmin,
   onOpenCreateTicket,
+  activePeripheralSub,
+  setActivePeripheralSub,
 }) => {
   const getTitle = () => {
     switch (activeTab) {
@@ -55,6 +60,8 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
         onLogout={onLogout} 
         onNavigateToAdmin={onNavigateToAdmin} 
         onOpenCreateTicket={onOpenCreateTicket}
+        activePeripheralSub={activePeripheralSub}
+        setActivePeripheralSub={setActivePeripheralSub}
       />
 
       {/* Main Content Area */}

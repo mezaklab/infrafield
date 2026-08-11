@@ -19,13 +19,53 @@ import {
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
 
+const TOKEN_KEY = 'infrafield_token';
+const USER_KEY  = 'infrafield_user';
+
+const initialToken = typeof window !== 'undefined' ? localStorage.getItem(TOKEN_KEY) : null;
+
 export const api = axios.create({
   baseURL: API_BASE_URL,
   timeout: 10000,
   headers: {
     'Content-Type': 'application/json',
+    ...(initialToken ? { Authorization: `Bearer ${initialToken}` } : {}),
   },
 });
+
+/**
+ * Response interceptor — tratamento global de token expirado / inválido.
+ *
+ * Quando a API retorna HTTP 401 ou uma mensagem de token inválido/expirado:
+ *  1. Remove token e dados do usuário do localStorage.
+ *  2. Remove o header Authorization do cliente Axios.
+ *  3. Emite o evento customizado `auth:unauthorized` para que o AuthContext
+ *     possa reagir e redirecionar o usuário para a tela de login.
+ */
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    const status  = error?.response?.status;
+    const message: string = error?.response?.data?.message ?? error?.response?.data?.error ?? '';
+
+    const isTokenError =
+      status === 401 ||
+      /token\s*(inv[áa]lido|expirado|expired|invalid)/i.test(message);
+
+    if (isTokenError) {
+      // Limpa sessão
+      localStorage.removeItem(TOKEN_KEY);
+      localStorage.removeItem(USER_KEY);
+      delete api.defaults.headers.common['Authorization'];
+
+      // Notifica o AuthContext via evento customizado para evitar
+      // dependência circular entre api.ts e AuthContext.tsx
+      window.dispatchEvent(new CustomEvent('auth:unauthorized'));
+    }
+
+    return Promise.reject(error);
+  }
+);
 
 export interface DashboardStats {
   assets: {
@@ -325,19 +365,54 @@ export const updateIssue = async (
 
 /* --- REPORT GENERATION & EXPORTS --- */
 
-export const downloadVisitPDFReport = (visitId: string) => {
-  const url = `${API_BASE_URL}/reports/visits/${visitId}/pdf`;
-  window.open(url, '_blank');
+const downloadBlobFile = (data: Blob, filename: string) => {
+  const url = window.URL.createObjectURL(data);
+  const link = document.createElement('a');
+  link.href = url;
+  link.setAttribute('download', filename);
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.URL.revokeObjectURL(url);
 };
 
-export const downloadInventoryPDFReport = () => {
-  const url = `${API_BASE_URL}/reports/inventory/pdf`;
-  window.open(url, '_blank');
+export const downloadVisitPDFReport = async (visitId: string): Promise<void> => {
+  try {
+    const response = await api.get(`/reports/visits/${visitId}/pdf`, {
+      responseType: 'blob',
+    });
+    downloadBlobFile(new Blob([response.data], { type: 'application/pdf' }), `relatorio_vistoria_${visitId}.pdf`);
+  } catch (error: any) {
+    console.error('Erro ao baixar relatório PDF da visita:', error);
+    alert('Não foi possível gerar ou baixar o relatório PDF. Verifique se sua sessão é válida e tente novamente.');
+    throw error;
+  }
 };
 
-export const exportAssetsCSV = () => {
-  const url = `${API_BASE_URL}/reports/assets/export`;
-  window.open(url, '_blank');
+export const downloadInventoryPDFReport = async (): Promise<void> => {
+  try {
+    const response = await api.get('/reports/inventory/pdf', {
+      responseType: 'blob',
+    });
+    downloadBlobFile(new Blob([response.data], { type: 'application/pdf' }), `relatorio_inventario_${new Date().toISOString().split('T')[0]}.pdf`);
+  } catch (error: any) {
+    console.error('Erro ao baixar relatório PDF do inventário:', error);
+    alert('Não foi possível gerar ou baixar o relatório PDF. Verifique se sua sessão é válida e tente novamente.');
+    throw error;
+  }
+};
+
+export const exportAssetsCSV = async (): Promise<void> => {
+  try {
+    const response = await api.get('/reports/assets/export', {
+      responseType: 'blob',
+    });
+    downloadBlobFile(new Blob([response.data], { type: 'text/csv' }), `exportacao_ativos_${new Date().toISOString().split('T')[0]}.csv`);
+  } catch (error: any) {
+    console.error('Erro ao exportar CSV:', error);
+    alert('Não foi possível exportar os dados em CSV. Tente novamente.');
+    throw error;
+  }
 };
 
 /* --- NOTIFICATION APIS --- */

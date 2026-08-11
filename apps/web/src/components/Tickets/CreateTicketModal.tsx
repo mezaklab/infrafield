@@ -14,7 +14,7 @@ import {
   Laptop
 } from 'lucide-react';
 import { api } from '../../services/api';
-import { Location, Asset, TicketPriority } from '../../types';
+import { Location, TicketPriority } from '../../types';
 import { useAuth } from '../../contexts/AuthContext';
 import { getLocationFullName } from '../../utils/location';
 
@@ -38,13 +38,12 @@ export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
 }) => {
   const { user } = useAuth();
   const [locations, setLocations] = useState<Location[]>([]);
-  const [assets, setAssets] = useState<Asset[]>([]);
   const [loadingLocations, setLoadingLocations] = useState<boolean>(true);
-  const [loadingAssets, setLoadingAssets] = useState<boolean>(true);
 
   // Form fields
   const [subject, setSubject] = useState<string>('');
   const [description, setDescription] = useState<string>('');
+  const [category, setCategory] = useState<string>('Wi-Fi / Rede');
   const [locationId, setLocationId] = useState<string>('');
   const [assetId, setAssetId] = useState<string>('');
   const [priority, setPriority] = useState<TicketPriority>('MEDIA');
@@ -80,20 +79,7 @@ export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
       }
     };
 
-    const fetchAssets = async () => {
-      try {
-        setLoadingAssets(true);
-        const res = await api.get<Asset[]>('/assets');
-        setAssets(res.data || []);
-      } catch (err) {
-        console.warn('Failed to load assets for ticket creation:', err);
-      } finally {
-        setLoadingAssets(false);
-      }
-    };
-
     fetchLocations();
-    fetchAssets();
   }, [isOpen, user]);
 
   if (!isOpen) return null;
@@ -134,6 +120,10 @@ export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
     e.preventDefault();
     setError(null);
 
+    if (!locationId) {
+      setError('O campo Setor / Localização é obrigatório.');
+      return;
+    }
     if (!subject.trim()) {
       setError('O assunto do chamado é obrigatório.');
       return;
@@ -150,7 +140,8 @@ export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
       await api.post('/tickets', {
         subject: subject.trim(),
         description: description.trim(),
-        locationId: locationId || undefined,
+        category,
+        locationId,
         assetId: assetId || undefined,
         priority,
         attachments: attachmentUrls,
@@ -159,6 +150,7 @@ export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
       // Reset form
       setSubject('');
       setDescription('');
+      setCategory('Wi-Fi / Rede');
       setAssetId('');
       setAttachments([]);
       onSuccess();
@@ -170,11 +162,6 @@ export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
       setIsSubmitting(false);
     }
   };
-
-  // Filter assets by selected locationId if present, or user's assigned assets
-  const filteredAssets = locationId
-    ? assets.filter((a) => a.locationId === locationId || (user?.id && a.assignedTo === user.id))
-    : assets;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-fadeIn">
@@ -229,9 +216,9 @@ export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
         )}
 
         <form onSubmit={handleSubmit} className="space-y-4 text-xs">
-          {/* Setor e Equipamento / Ativo Afetado */}
+          {/* Setor e Categoria */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {/* Setor / Localidade */}
+            {/* Setor / Localidade (Obrigatório) */}
             <div className="space-y-1.5">
               <label className="text-slate-300 font-bold flex items-center gap-1.5">
                 <Building2 className="w-4 h-4 text-cyan-400" />
@@ -245,6 +232,7 @@ export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
                   onChange={(e) => setLocationId(e.target.value)}
                   className="w-full px-3.5 py-3 rounded-xl bg-[#050811] border border-slate-800 text-white font-semibold outline-none focus:border-cyan-500 transition-colors"
                 >
+                  <option value="">Selecione a Localidade / Setor *</option>
                   {locations.map((loc) => (
                     <option key={loc.id} value={loc.id}>
                       {getLocationFullName(loc, locations)} {loc.room ? `(${loc.room})` : ''}
@@ -254,26 +242,24 @@ export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
               </div>
             </div>
 
-            {/* Equipamento / Ativo Afetado (Opcional) */}
+            {/* Categoria Simplificada */}
             <div className="space-y-1.5">
               <label className="text-slate-300 font-bold flex items-center gap-1.5">
                 <Laptop className="w-4 h-4 text-purple-400" />
-                <span>Equipamento / Ativo Afetado</span>
-                <span className="text-[10px] text-slate-500 font-normal">(Opcional)</span>
+                <span>Categoria *</span>
               </label>
               <div className="relative">
                 <select
-                  disabled={loadingAssets}
-                  value={assetId}
-                  onChange={(e) => setAssetId(e.target.value)}
+                  required
+                  value={category}
+                  onChange={(e) => setCategory(e.target.value)}
                   className="w-full px-3.5 py-3 rounded-xl bg-[#050811] border border-slate-800 text-white font-semibold outline-none focus:border-cyan-500 transition-colors cursor-pointer"
                 >
-                  <option value="">Nenhum / Não se aplica (Dúvida, Sistema, Geral)</option>
-                  {(filteredAssets.length > 0 ? filteredAssets : assets).map((ast) => (
-                    <option key={ast.id} value={ast.id}>
-                      {ast.name} ({ast.code}{ast.assetTag ? ` - Pat: ${ast.assetTag}` : ''})
-                    </option>
-                  ))}
+                  <option value="Wi-Fi / Rede">Wi-Fi / Rede</option>
+                  <option value="Computador">Computador</option>
+                  <option value="Impressora">Impressora</option>
+                  <option value="Periféricos">Periféricos</option>
+                  <option value="Outros">Outros</option>
                 </select>
               </div>
             </div>

@@ -14,12 +14,13 @@ import {
   Zap,
   XCircle
 } from 'lucide-react';
-import { api } from '../services/api';
+import { api, downloadInventoryPDFReport, exportAssetsCSV } from '../services/api';
 import { Ticket, TicketStatus, TicketPriority, Location, SystemUser } from '../types';
 import { useAuth } from '../contexts/AuthContext';
 import { getSocket } from '../services/socket';
 import { CreateTicketModal } from '../components/Tickets/CreateTicketModal';
 import { TicketDetailModal } from '../components/Tickets/TicketDetailModal';
+import { ExportDropdown } from '../components/Layout/ExportDropdown';
 
 interface TicketsProps {
   isCreateOpen?: boolean;
@@ -230,13 +231,33 @@ export const Tickets: React.FC<TicketsProps> = ({ isCreateOpen = false, onCloseC
             </div>
           </div>
 
-          <button
-            onClick={() => setIsCreateModalOpen(true)}
-            className="flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl bg-gradient-to-r from-cyan-500 via-blue-600 to-indigo-600 hover:from-cyan-400 hover:to-indigo-500 text-white font-extrabold text-xs shadow-xl shadow-cyan-500/30 transition-all cursor-pointer shrink-0"
-          >
-            <Plus className="w-4 h-4 stroke-[3]" />
-            <span>Abrir Novo Chamado</span>
-          </button>
+          <div className="flex items-center gap-2 flex-wrap shrink-0">
+            <ExportDropdown
+              options={[
+                {
+                  id: 'pdf-inventory',
+                  label: 'Relatório de Inventário (PDF)',
+                  sublabel: 'Documento oficial formatado',
+                  type: 'pdf',
+                  onExport: downloadInventoryPDFReport,
+                },
+                {
+                  id: 'csv-inventory',
+                  label: 'Exportar Inventário (CSV)',
+                  sublabel: 'Planilha em formato CSV',
+                  type: 'csv',
+                  onExport: exportAssetsCSV,
+                },
+              ]}
+            />
+
+            <button
+              onClick={() => setIsCreateModalOpen(true)}
+              className="flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl bg-gradient-to-r from-cyan-500 via-blue-600 to-indigo-600 hover:from-cyan-400 hover:to-indigo-500 text-white font-extrabold text-xs shadow-xl shadow-cyan-500/30 transition-all cursor-pointer"
+            >
+              <Plus className="w-4 h-4" /> <span>Abrir Novo Chamado</span>
+            </button>
+          </div>
         </div>
       </div>
 

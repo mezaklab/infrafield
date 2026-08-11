@@ -19,6 +19,7 @@ interface AuthContextValue {
   user: AuthUser | null;
   token: string | null;
   isAuthenticated: boolean;
+  isLoading: boolean;
   isSuperAdmin: boolean;   // SUPERADMIN only
   isAdmin: boolean;        // SUPERADMIN or ADMIN
   isManager: boolean;      // SUPERADMIN, ADMIN or MANAGER
@@ -35,11 +36,33 @@ const TOKEN_KEY = 'infrafield_token';
 const USER_KEY  = 'infrafield_user';
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<AuthUser | null>(() => {
-    try { return JSON.parse(localStorage.getItem(USER_KEY) || 'null'); }
-    catch { return null; }
+  // Leitura síncrona imediata do localStorage na inicialização do estado
+  const [token, setToken] = useState<string | null>(() => {
+    try {
+      const storedToken = localStorage.getItem(TOKEN_KEY);
+      if (storedToken) {
+        api.defaults.headers.common['Authorization'] = `Bearer ${storedToken}`;
+        return storedToken;
+      }
+    } catch (e) {
+      console.error('Erro ao ler token do localStorage:', e);
+    }
+    return null;
   });
-  const [token, setToken] = useState<string | null>(() => localStorage.getItem(TOKEN_KEY));
+
+  const [user, setUser] = useState<AuthUser | null>(() => {
+    try {
+      const storedUser = localStorage.getItem(USER_KEY);
+      if (storedUser) {
+        return JSON.parse(storedUser);
+      }
+    } catch (e) {
+      console.error('Erro ao ler usuário do localStorage:', e);
+    }
+    return null;
+  });
+
+  const [isLoading] = useState<boolean>(false);
 
   // Sync axios default header whenever token changes
   useEffect(() => {
@@ -49,6 +72,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       delete api.defaults.headers.common['Authorization'];
     }
   }, [token]);
+
+  // Escuta o evento disparado pelo interceptor do Axios quando a API retorna
+  // 401 ou mensagem de token inválido/expirado — faz logout automaticamente.
+  useEffect(() => {
+    const handleUnauthorized = () => {
+      // logout() já limpa o localStorage; aqui apenas sincroniza o estado React
+      setToken(null);
+      setUser(null);
+    };
+
+    window.addEventListener('auth:unauthorized', handleUnauthorized);
+    return () => window.removeEventListener('auth:unauthorized', handleUnauthorized);
+  }, []);
 
   const login = useCallback(async (username: string, password: string) => {
     const response = await api.post<{ token: string; user: AuthUser }>('/auth/login', { identifier: username, password });
@@ -69,7 +105,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUser(null);
   }, []);
 
-  const isAuthenticated = !!user && !!token;
+  const isAuthenticated = !isLoading && !!user && !!token;
   const isSuperAdmin   = user?.role === 'SUPERADMIN';
   const isAdmin        = user?.role === 'SUPERADMIN' || user?.role === 'ADMIN';
   const isManager      = user?.role === 'SUPERADMIN' || user?.role === 'ADMIN' || user?.role === 'MANAGER';
@@ -78,7 +114,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const canAccessAdmin = isSuperAdmin || isAdmin;
 
   return (
-    <AuthContext.Provider value={{ user, token, isAuthenticated, isSuperAdmin, isAdmin, isManager, isTechnician, isFinalUser, canAccessAdmin, login, logout }}>
+    <AuthContext.Provider value={{ user, token, isAuthenticated, isLoading, isSuperAdmin, isAdmin, isManager, isTechnician, isFinalUser, canAccessAdmin, login, logout }}>
       {children}
     </AuthContext.Provider>
   );

@@ -1,4 +1,5 @@
 export type TabType = 'dashboard' | 'assets' | 'visits' | 'issues' | 'peripherals' | 'tickets' | 'ticket-dashboard';
+export type PeripheralsSubTab = 'TODOS' | 'COMPUTADOR' | 'MONITOR' | 'SOFTWARE' | 'REDE' | 'PERIFERICO';
 export type AdminTabType = 'dashboard' | 'users' | 'audit-logs' | 'settings' | 'locations';
 
 export interface SystemUser {
@@ -77,8 +78,8 @@ export interface Location {
   children?: { id: string; name: string }[];
 }
 
-export type PeripheralCategory = 'COMPUTADOR' | 'IMPRESSORA' | 'SCANNER' | 'MONITOR';
-export type PeripheralSubcategory = 'DESKTOP' | 'NOTEBOOK';
+export type PeripheralCategory = 'COMPUTADOR' | 'IMPRESSORA' | 'SCANNER' | 'MONITOR' | 'SOFTWARE' | 'SWITCH' | 'ROTEADOR' | 'AP' | 'NOBREAK' | 'OUTRO';
+export type PeripheralSubcategory = 'DESKTOP' | 'NOTEBOOK' | 'SERVIDOR';
 
 export interface Peripheral {
   id: string;
@@ -114,10 +115,17 @@ export interface PeripheralStats {
     IMPRESSORA: number;
     SCANNER: number;
     MONITOR: number;
+    SOFTWARE: number;
+    SWITCH: number;
+    ROTEADOR: number;
+    AP: number;
+    NOBREAK: number;
+    OUTRO: number;
   };
   bySubcategory: {
     DESKTOP: number;
     NOTEBOOK: number;
+    SERVIDOR: number;
   };
 }
 

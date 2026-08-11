@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { MapPin, Calendar, Clock, User, Plus, Filter, CheckCircle2, AlertTriangle, Search, X, RefreshCw, ShieldCheck, FileText } from 'lucide-react';
 import { Visit, Location } from '../types';
-import { getVisits, createVisit, getLocations, downloadVisitPDFReport } from '../services/api';
+import { getVisits, createVisit, getLocations, downloadVisitPDFReport, downloadInventoryPDFReport, exportAssetsCSV } from '../services/api';
 import { InspectionMode } from '../components/Visits/InspectionMode';
+import { ExportDropdown } from '../components/Layout/ExportDropdown';
 
 export const Visits: React.FC = () => {
   const [visits, setVisits] = useState<Visit[]>([]);
@@ -156,6 +157,25 @@ export const Visits: React.FC = () => {
           >
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
           </button>
+
+          <ExportDropdown
+            options={[
+              {
+                id: 'pdf-inventory',
+                label: 'Relatório de Inventário Geral (PDF)',
+                sublabel: 'Documento oficial formatado',
+                type: 'pdf',
+                onExport: downloadInventoryPDFReport,
+              },
+              {
+                id: 'csv-inventory',
+                label: 'Exportar Inventário (CSV)',
+                sublabel: 'Planilha em formato CSV',
+                type: 'csv',
+                onExport: exportAssetsCSV,
+              },
+            ]}
+          />
 
           <button
             onClick={() => setIsModalOpen(true)}

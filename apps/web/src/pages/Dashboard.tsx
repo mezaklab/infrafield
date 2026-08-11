@@ -6,7 +6,6 @@ import {
   CheckCircle2, 
   Server, 
   RefreshCw, 
-  Zap, 
   ChevronRight,
   TrendingUp,
   ShieldCheck,
@@ -14,7 +13,6 @@ import {
   Network,
   ShieldAlert,
   Wifi,
-  FileText,
   Building,
   X,
   ArrowRight,
@@ -37,6 +35,7 @@ import {
 } from '../services/api';
 import { getSocket, StatusUpdatedPayload } from '../services/socket';
 import { TelemetryWaveform } from '../components/TelemetryWaveform';
+import { ExportDropdown } from '../components/Layout/ExportDropdown';
 
 interface DashboardProps {
   onNavigate: (tab: TabType) => void;
@@ -258,32 +257,36 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
           </div>
 
           <div className="flex items-center gap-2 flex-wrap">
-            <button
-              onClick={exportAssetsCSV}
-              className="flex items-center gap-1.5 bg-[#050811] hover:bg-slate-800 border border-slate-800 text-slate-200 text-xs font-semibold px-3 py-2.5 rounded-xl transition-all"
-              title="Exportar CSV de Inventário"
-            >
-              <Zap className="w-3.5 h-3.5 text-emerald-400" />
-              <span>Exportar CSV</span>
-            </button>
-
-            <button
-              onClick={downloadInventoryPDFReport}
-              className="flex items-center gap-1.5 bg-[#050811] hover:bg-slate-800 border border-slate-800 text-slate-200 text-xs font-semibold px-3 py-2.5 rounded-xl transition-all"
-              title="Gerar PDF de Inventário"
-            >
-              <FileText className="w-3.5 h-3.5 text-[#00f2fe]" />
-              <span>Relatório PDF</span>
-            </button>
-
+            {/* Sync button */}
             <button
               onClick={loadData}
               disabled={loadingHealth}
-              className="p-2.5 bg-[#050811] hover:bg-slate-800 text-slate-400 hover:text-white rounded-xl border border-slate-800 transition-all cursor-pointer"
+              className="p-2.5 bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-white rounded-xl border border-slate-800 transition-all flex items-center gap-1.5 text-xs font-semibold cursor-pointer"
               title="Recarregar Telemetria"
             >
               <RefreshCw className={`w-4 h-4 ${loadingHealth ? 'animate-spin text-[#00f2fe]' : ''}`} />
+              <span className="hidden sm:inline">Sincronizar</span>
             </button>
+
+            {/* Reusable Export Dropdown */}
+            <ExportDropdown
+              options={[
+                {
+                  id: 'csv-inventory',
+                  label: 'Exportar Inventário (CSV)',
+                  sublabel: 'Download em planilha CSV',
+                  type: 'csv',
+                  onExport: exportAssetsCSV,
+                },
+                {
+                  id: 'pdf-inventory',
+                  label: 'Relatório de Inventário (PDF)',
+                  sublabel: 'Documento oficial formatado',
+                  type: 'pdf',
+                  onExport: downloadInventoryPDFReport,
+                },
+              ]}
+            />
           </div>
         </div>
 

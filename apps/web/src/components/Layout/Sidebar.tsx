@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { 
   LayoutDashboard, 
   Network, 
@@ -11,10 +11,19 @@ import {
   ArrowRight, 
   Headset,
   BarChart3,
-  PlusCircle
+  PlusCircle,
+  ChevronDown,
+  Cpu,
+  Monitor as MonitorIcon,
+  Printer,
+  Wifi,
+  Layers,
+  HardDrive
 } from 'lucide-react';
 import { TabType } from '../../types';
 import { useAuth } from '../../contexts/AuthContext';
+
+export type PeripheralsSubTab = 'TODOS' | 'COMPUTADOR' | 'MONITOR' | 'SOFTWARE' | 'REDE' | 'PERIFERICO';
 
 interface SidebarProps {
   activeTab: TabType;
@@ -22,24 +31,37 @@ interface SidebarProps {
   onLogout: () => void;
   onNavigateToAdmin?: () => void;
   onOpenCreateTicket?: () => void;
+  activePeripheralSub?: PeripheralsSubTab;
+  setActivePeripheralSub?: (sub: PeripheralsSubTab) => void;
 }
+
+const PERIPHERAL_SUBMODULES: { id: PeripheralsSubTab; label: string; icon: React.ComponentType<any>; color: string }[] = [
+  { id: 'TODOS',      label: 'Todos os Ativos',            icon: Layers,      color: 'text-slate-400' },
+  { id: 'COMPUTADOR', label: 'Computadores',               icon: Cpu,         color: 'text-cyan-400' },
+  { id: 'MONITOR',    label: 'Monitores',                  icon: MonitorIcon,  color: 'text-blue-400' },
+  { id: 'SOFTWARE',   label: 'Softwares',                  icon: HardDrive,   color: 'text-violet-400' },
+  { id: 'REDE',       label: 'Dispositivos de Rede',       icon: Wifi,        color: 'text-emerald-400' },
+  { id: 'PERIFERICO', label: 'Periféricos / Outros',       icon: Printer,     color: 'text-amber-400' },
+];
 
 export const Sidebar: React.FC<SidebarProps> = ({ 
   activeTab, 
   setActiveTab, 
   onLogout, 
   onNavigateToAdmin,
-  onOpenCreateTicket
+  onOpenCreateTicket,
+  activePeripheralSub = 'TODOS',
+  setActivePeripheralSub,
 }) => {
   const { user, isSuperAdmin, isFinalUser } = useAuth();
   const hasAdminRole = user?.role === 'SUPERADMIN' || user?.role === 'ADMIN';
+  const [isPeripheralExpanded, setIsPeripheralExpanded] = useState(activeTab === 'peripherals');
 
   const mainNavItems = [
     { id: 'dashboard' as TabType, label: 'Dashboard NOC', icon: LayoutDashboard },
     { id: 'assets' as TabType, label: 'Redes', icon: Network },
     { id: 'visits' as TabType, label: 'Visitas & Vistorias', icon: MapPin },
     { id: 'issues' as TabType, label: 'Não Conformidades', icon: AlertTriangle },
-    { id: 'peripherals' as TabType, label: 'Ativos de TI', icon: Laptop },
   ];
 
   const helpdeskNavItems = isFinalUser
@@ -48,6 +70,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         { id: 'ticket-dashboard' as TabType, label: 'Dashboard Helpdesk', icon: BarChart3 },
         { id: 'tickets' as TabType, label: 'Chamados', icon: Headset },
       ];
+
 
   return (
     <aside className="hidden md:flex flex-col w-64 bg-slate-900 border-r border-slate-800 h-screen sticky top-0 p-4 select-none overflow-y-auto custom-scrollbar">
@@ -91,6 +114,55 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   </button>
                 );
               })}
+
+              {/* Ativos de TI — Expandable Submenu */}
+              <div>
+                <button
+                  onClick={() => {
+                    setActiveTab('peripherals');
+                    setIsPeripheralExpanded(prev => activeTab !== 'peripherals' ? true : !prev);
+                  }}
+                  className={`w-full flex items-center justify-between gap-3 px-3.5 py-2.5 rounded-xl font-medium text-xs transition-all duration-200 ${
+                    activeTab === 'peripherals'
+                      ? 'bg-gradient-to-r from-cyan-500/15 to-blue-500/10 text-cyan-400 border border-cyan-500/30 shadow-sm'
+                      : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <Laptop className={`w-4 h-4 shrink-0 transition-transform ${activeTab === 'peripherals' ? 'scale-110 text-cyan-400' : ''}`} />
+                    <span className="truncate whitespace-nowrap">Ativos de TI</span>
+                  </div>
+                  <ChevronDown
+                    className={`w-3.5 h-3.5 shrink-0 transition-transform duration-200 ${
+                      (isPeripheralExpanded && activeTab === 'peripherals') ? 'rotate-180' : ''
+                    }`}
+                  />
+                </button>
+
+                {/* Sub-navigation items */}
+                {(isPeripheralExpanded && activeTab === 'peripherals') && (
+                  <div className="ml-4 mt-1 space-y-0.5 border-l border-slate-800 pl-3">
+                    {PERIPHERAL_SUBMODULES.map((sub) => {
+                      const SubIcon = sub.icon;
+                      const isSubActive = activePeripheralSub === sub.id;
+                      return (
+                        <button
+                          key={sub.id}
+                          onClick={() => setActivePeripheralSub?.(sub.id)}
+                          className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg font-medium text-[11px] transition-all duration-150 ${
+                            isSubActive
+                              ? `${sub.color} bg-slate-800/80 border border-slate-700/60 font-bold`
+                              : 'text-slate-500 hover:text-slate-300 hover:bg-slate-800/40'
+                          }`}
+                        >
+                          <SubIcon className={`w-3.5 h-3.5 shrink-0 ${isSubActive ? sub.color : ''}`} />
+                          <span className="truncate">{sub.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         )}
