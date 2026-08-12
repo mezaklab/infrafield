@@ -4,19 +4,23 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { prisma } from '../lib/prisma';
 import { requireAuth } from '../middlewares/auth.middleware';
+import { loginRateLimiter, passwordRateLimiter } from '../middlewares/rateLimit.middleware';
+import { JWT_AUDIENCE, JWT_EXPIRES_IN, JWT_ISSUER, JWT_SECRET } from '../config/security';
 
 export const authRouter = Router();
 
-const JWT_SECRET = process.env.JWT_SECRET || 'infrafield-secret-change-in-production';
-const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '8h';
-
 const LoginSchema = z.object({
-  identifier: z.string().min(1, 'Identificador (usuário ou e-mail) é obrigatório'),
-  password: z.string().min(1, 'Senha é obrigatória'),
+  identifier: z.string().trim().min(1, 'Identificador (usuário ou e-mail) é obrigatório').max(254),
+  password: z.string().min(1, 'Senha é obrigatória').max(128),
+});
+
+const ChangePasswordSchema = z.object({
+  currentPassword: z.string().min(1).max(128),
+  newPassword: z.string().min(8, 'A nova senha deve ter pelo menos 8 caracteres.').max(128),
 });
 
 // POST /api/auth/login
-authRouter.post('/login', async (req: Request, res: Response) => {
+authRouter.post('/login', loginRateLimiter, async (req: Request, res: Response) => {
   try {
     const parsed = LoginSchema.safeParse(req.body);
     if (!parsed.success) {
@@ -56,7 +60,12 @@ authRouter.post('/login', async (req: Request, res: Response) => {
       companyId: user.companyId,
     };
 
-    const token = jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN } as jwt.SignOptions);
+    const token = jwt.sign(payload, JWT_SECRET, {
+      algorithm: 'HS256',
+      expiresIn: JWT_EXPIRES_IN,
+      issuer: JWT_ISSUER,
+      audience: JWT_AUDIENCE,
+    } as jwt.SignOptions);
 
     return res.json({
       token,
@@ -105,12 +114,13 @@ authRouter.get('/me', requireAuth, async (req: Request, res: Response) => {
 });
 
 // POST /api/auth/change-password
-authRouter.post('/change-password', requireAuth, async (req: Request, res: Response) => {
+authRouter.post('/change-password', requireAuth, passwordRateLimiter, async (req: Request, res: Response) => {
   try {
-    const { currentPassword, newPassword } = req.body;
-    if (!currentPassword || !newPassword || newPassword.length < 6) {
-      return res.status(400).json({ error: 'Senha atual e nova senha (mínimo 6 caracteres) são obrigatórias.' });
+    const parsed = ChangePasswordSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: 'Dados inválidos', details: parsed.error.format() });
     }
+    const { currentPassword, newPassword } = parsed.data;
 
     const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
     if (!user) return res.status(404).json({ error: 'Usuário não encontrado.' });

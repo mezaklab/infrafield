@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { api } from '../services/api';
+import { setSocketAuthToken } from '../services/socket';
 import { Location } from '../types';
 
 export type UserRole = 'SUPERADMIN' | 'ADMIN' | 'MANAGER' | 'TECHNICIAN' | 'VIEWER' | 'USUARIO';
@@ -93,6 +94,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     localStorage.setItem(TOKEN_KEY, newToken);
     localStorage.setItem(USER_KEY, JSON.stringify(newUser));
     api.defaults.headers.common['Authorization'] = `Bearer ${newToken}`;
+    setSocketAuthToken(newToken);
     setToken(newToken);
     setUser(newUser);
   }, []);
@@ -101,6 +103,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(USER_KEY);
     delete api.defaults.headers.common['Authorization'];
+    setSocketAuthToken(null);
     setToken(null);
     setUser(null);
   }, []);

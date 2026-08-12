@@ -5,6 +5,7 @@ const SOCKET_URL = import.meta.env.VITE_API_URL
   : 'http://localhost:3333';
 
 let socket: Socket | null = null;
+const TOKEN_KEY = 'infrafield_token';
 
 export interface StatusUpdatedPayload {
   id: string;
@@ -22,6 +23,7 @@ export const getSocket = (): Socket => {
   if (!socket) {
     socket = io(SOCKET_URL, {
       autoConnect: true,
+      auth: { token: localStorage.getItem(TOKEN_KEY) },
       transports: ['websocket', 'polling'],
       reconnectionAttempts: 15,
       reconnectionDelay: 2000,
@@ -41,4 +43,11 @@ export const getSocket = (): Socket => {
   }
 
   return socket;
+};
+
+export const setSocketAuthToken = (token: string | null): void => {
+  if (!socket) return;
+  socket.auth = { token };
+  socket.disconnect();
+  if (token) socket.connect();
 };

@@ -4,46 +4,54 @@ import { TicketStatus, TicketPriority, Role } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { getIO } from '../services/websocket.service';
 import { sendTicketNotification } from '../services/whatsapp.service';
+import { ticketCreationRateLimiter } from '../middlewares/rateLimit.middleware';
+import { requireRole } from '../middlewares/auth.middleware';
+import crypto from 'crypto';
 
 
 export const ticketRouter = Router();
 
 // Validation Schemas
 const CreateTicketSchema = z.object({
-  subject: z.string().min(3, 'Assunto é obrigatório'),
-  description: z.string().min(5, 'Descrição detalhada é obrigatória'),
-  category: z.string().optional().default('Outros'),
-  locationId: z.string().min(1, 'Setor / Localização é obrigatório'),
-  assetId: z.string().optional().nullable(),
+  subject: z.string().trim().min(3, 'Assunto é obrigatório').max(160),
+  description: z.string().trim().min(5, 'Descrição detalhada é obrigatória').max(5000),
+  category: z.string().trim().max(100).optional().default('Outros'),
+  locationId: z.string().uuid('Localização inválida'),
+  assetId: z.string().uuid('Ativo inválido').optional().nullable(),
   priority: z.nativeEnum(TicketPriority).optional().default(TicketPriority.MEDIA),
-  attachments: z.array(z.string()).optional(),
+  attachments: z.array(z.string().max(500)).max(10).optional(),
 });
 
 const UpdateTicketSchema = z.object({
   status: z.nativeEnum(TicketStatus).optional(),
   priority: z.nativeEnum(TicketPriority).optional(),
-  assignedToId: z.string().optional().nullable(),
+  assignedToId: z.string().uuid().optional().nullable(),
 });
 
 const CreateMessageSchema = z.object({
-  content: z.string().optional().default(''),
-  attachments: z.array(z.string()).optional(),
+  content: z.string().trim().max(5000).optional().default(''),
+  attachments: z.array(z.string().max(500)).max(10).optional(),
 });
 
 // Helper for broadcasting WebSocket events
-function broadcastTicketEvent(event: string, payload: any) {
+function broadcastTicketEvent(
+  event: string,
+  payload: unknown,
+  access: { companyId: string; authorId: string },
+) {
   const io = getIO();
   if (io) {
-    io.emit(event, payload);
+    io.to(`staff:${access.companyId}`).to(`user:${access.authorId}`).emit(event, payload);
   }
 }
 
 // ─── GET /api/tickets/technicians ─────────────────────────────────────────────
-ticketRouter.get('/technicians', async (_req: Request, res: Response) => {
+ticketRouter.get('/technicians', async (req: Request, res: Response) => {
   try {
     const technicians = await prisma.user.findMany({
       where: {
         role: { in: [Role.TECHNICIAN, Role.MANAGER, Role.ADMIN, Role.SUPERADMIN] },
+        ...(req.user!.role === Role.SUPERADMIN ? {} : { companyId: req.user!.companyId }),
       },
       select: {
         id: true,
@@ -67,6 +75,9 @@ ticketRouter.get('/dashboard', async (req: Request, res: Response) => {
     const userId = req.user!.userId;
 
     const baseWhere: any = {};
+    if (userRole !== Role.SUPERADMIN) {
+      baseWhere.companyId = req.user!.companyId;
+    }
     if (userRole === Role.USUARIO) {
       baseWhere.authorId = userId;
     }
@@ -245,6 +256,9 @@ ticketRouter.get('/', async (req: Request, res: Response) => {
     const userId = req.user!.userId;
 
     const where: any = {};
+    if (userRole !== Role.SUPERADMIN) {
+      where.companyId = req.user!.companyId;
+    }
 
     // Final users can only see their own created tickets
     if (userRole === Role.USUARIO) {
@@ -324,6 +338,10 @@ ticketRouter.get('/:id', async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'Chamado não encontrado.' });
     }
 
+    if (userRole !== Role.SUPERADMIN && ticket.companyId !== req.user!.companyId) {
+      return res.status(403).json({ error: 'Acesso negado a este chamado.' });
+    }
+
     // Permission check
     if (userRole === Role.USUARIO && ticket.authorId !== userId) {
       return res.status(403).json({ error: 'Acesso negado a este chamado.' });
@@ -337,7 +355,7 @@ ticketRouter.get('/:id', async (req: Request, res: Response) => {
 });
 
 // ─── POST /api/tickets ────────────────────────────────────────────────────────
-ticketRouter.post('/', async (req: Request, res: Response) => {
+ticketRouter.post('/', ticketCreationRateLimiter, async (req: Request, res: Response) => {
   try {
     const parsed = CreateTicketSchema.safeParse(req.body);
     if (!parsed.success) {
@@ -357,19 +375,17 @@ ticketRouter.post('/', async (req: Request, res: Response) => {
       targetLocationId = user?.locationId || null;
     }
 
-    // Generate ticket unique code: TK-XXXXXX
-    const count = await prisma.ticket.count();
-    const code = `TK-${(1000 + count + 1).toString()}`;
-
-    // Get company ID
-    const userCompany = await prisma.user.findUnique({
-      where: { id: authorId },
-      select: { companyId: true },
-    });
-
-    if (!userCompany) {
-      return res.status(400).json({ error: 'Empresa do usuário não identificada.' });
+    const companyId = req.user!.companyId;
+    const location = await prisma.location.findFirst({ where: { id: targetLocationId!, companyId } });
+    if (!location) {
+      return res.status(400).json({ error: 'Localização inválida para a empresa do usuário.' });
     }
+    if (assetId) {
+      const asset = await prisma.asset.findFirst({ where: { id: assetId, companyId } });
+      if (!asset) return res.status(400).json({ error: 'Ativo inválido para a empresa do usuário.' });
+    }
+
+    const code = `TK-${crypto.randomUUID().slice(0, 8).toUpperCase()}`;
 
     // Create ticket & initial message inside a transaction
     const newTicket = await prisma.$transaction(async (tx) => {
@@ -380,7 +396,7 @@ ticketRouter.post('/', async (req: Request, res: Response) => {
           description,
           status: TicketStatus.ABERTO,
           priority,
-          companyId: userCompany.companyId,
+          companyId,
           locationId: targetLocationId,
           assetId: assetId || null,
           authorId,
@@ -415,7 +431,10 @@ ticketRouter.post('/', async (req: Request, res: Response) => {
       },
     });
 
-    broadcastTicketEvent('ticketCreated', createdTicket);
+    broadcastTicketEvent('ticketCreated', createdTicket, {
+      companyId: createdTicket!.companyId,
+      authorId: createdTicket!.authorId,
+    });
 
     // Envia notificação para o grupo do WhatsApp usando o serviço dedicado
     if (createdTicket) {
@@ -441,7 +460,7 @@ ticketRouter.post('/', async (req: Request, res: Response) => {
 });
 
 // ─── PATCH /api/tickets/:id ───────────────────────────────────────────────────
-ticketRouter.patch('/:id', async (req: Request, res: Response) => {
+ticketRouter.patch('/:id', requireRole([Role.SUPERADMIN, Role.ADMIN, Role.MANAGER, Role.TECHNICIAN]), async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const parsed = UpdateTicketSchema.safeParse(req.body);
@@ -451,6 +470,16 @@ ticketRouter.patch('/:id', async (req: Request, res: Response) => {
 
     const { status, priority, assignedToId } = parsed.data;
     const updateData: any = {};
+
+    const existingTicket = await prisma.ticket.findUnique({ where: { id } });
+    if (!existingTicket) return res.status(404).json({ error: 'Chamado não encontrado.' });
+    if (req.user!.role !== Role.SUPERADMIN && existingTicket.companyId !== req.user!.companyId) {
+      return res.status(403).json({ error: 'Acesso negado a este chamado.' });
+    }
+    if (assignedToId) {
+      const assignee = await prisma.user.findFirst({ where: { id: assignedToId, companyId: existingTicket.companyId } });
+      if (!assignee) return res.status(400).json({ error: 'Técnico inválido para este chamado.' });
+    }
 
     if (status) updateData.status = status;
     if (priority) updateData.priority = priority;
@@ -466,7 +495,10 @@ ticketRouter.patch('/:id', async (req: Request, res: Response) => {
       },
     });
 
-    broadcastTicketEvent('ticketUpdated', updatedTicket);
+    broadcastTicketEvent('ticketUpdated', updatedTicket, {
+      companyId: updatedTicket.companyId,
+      authorId: updatedTicket.authorId,
+    });
 
     return res.json(updatedTicket);
   } catch (error) {
@@ -495,6 +527,10 @@ ticketRouter.post('/:id/messages', async (req: Request, res: Response) => {
     const ticket = await prisma.ticket.findUnique({ where: { id } });
     if (!ticket) {
       return res.status(404).json({ error: 'Chamado não encontrado.' });
+    }
+
+    if (senderRole !== Role.SUPERADMIN && ticket.companyId !== req.user!.companyId) {
+      return res.status(403).json({ error: 'Acesso negado a este chamado.' });
     }
 
     // Permission check for USUARIO
@@ -536,7 +572,10 @@ ticketRouter.post('/:id/messages', async (req: Request, res: Response) => {
       return msg;
     });
 
-    broadcastTicketEvent('ticketMessageAdded', { ticketId: id, message });
+    broadcastTicketEvent('ticketMessageAdded', { ticketId: id, message }, {
+      companyId: ticket.companyId,
+      authorId: ticket.authorId,
+    });
 
     return res.status(201).json(message);
   } catch (error) {

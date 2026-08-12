@@ -6,6 +6,17 @@ import crypto from 'crypto';
 
 export const uploadRouter = Router();
 
+const ALLOWED_MIME_TYPES: Record<string, string> = {
+  'image/jpeg': '.jpg',
+  'image/png': '.png',
+  'image/webp': '.webp',
+  'image/gif': '.gif',
+  'application/pdf': '.pdf',
+  'text/plain': '.txt',
+  'video/mp4': '.mp4',
+  'video/webm': '.webm',
+};
+
 // Ensure storage/uploads folder exists
 const uploadDir = path.join(process.cwd(), 'storage', 'uploads');
 if (!fs.existsSync(uploadDir)) {
@@ -18,7 +29,7 @@ const storage = multer.diskStorage({
     cb(null, uploadDir);
   },
   filename: (_req, file, cb) => {
-    const ext = path.extname(file.originalname) || '.jpg';
+    const ext = ALLOWED_MIME_TYPES[file.mimetype];
     const uniqueId = crypto.randomUUID ? crypto.randomUUID().slice(0, 8) : Date.now().toString();
     const safeName = `${Date.now()}-${uniqueId}${ext}`;
     cb(null, safeName);
@@ -27,16 +38,24 @@ const storage = multer.diskStorage({
 
 const upload = multer({
   storage,
-  limits: { fileSize: 50 * 1024 * 1024 }, // 50MB limit to accommodate video/image prints
-  fileFilter: (_req, _file, cb) => {
-    // Allow images, videos, text, pdfs, logs, etc.
+  limits: { fileSize: 15 * 1024 * 1024, files: 1 },
+  fileFilter: (_req, file, cb) => {
+    if (!ALLOWED_MIME_TYPES[file.mimetype]) {
+      cb(new Error('Tipo de arquivo não permitido.'));
+      return;
+    }
     cb(null, true);
   },
 });
 
 // POST /api/upload - File/Photo attachment upload
-uploadRouter.post('/', upload.single('file'), (req: Request, res: Response) => {
-  try {
+uploadRouter.post('/', (req: Request, res: Response) => {
+  upload.single('file')(req, res, (error: unknown) => {
+    if (error) {
+      const status = error instanceof multer.MulterError && error.code === 'LIMIT_FILE_SIZE' ? 413 : 400;
+      return res.status(status).json({ error: error instanceof Error ? error.message : 'Upload inválido.' });
+    }
+
     if (!req.file) {
       return res.status(400).json({ error: 'Nenhum arquivo enviado.' });
     }
@@ -49,7 +68,5 @@ uploadRouter.post('/', upload.single('file'), (req: Request, res: Response) => {
       size: req.file.size,
       mimetype: req.file.mimetype,
     });
-  } catch (error) {
-    return res.status(500).json({ error: 'Erro ao salvar upload de arquivo.' });
-  }
+  });
 });

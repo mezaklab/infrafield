@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma';
-import { AssetStatus, PeripheralCategory, PeripheralSubcategory, Prisma } from '@prisma/client';
+import { AssetStatus, PeripheralCategory, PeripheralSubcategory, Prisma, Role } from '@prisma/client';
 import { processAndSaveEquipmentImage } from '../services/imageProcessor.service';
 import { emitAssetStatusUpdate } from '../services/websocket.service';
 
@@ -28,12 +28,17 @@ const CreateAssetSchema = z.object({
 
 const UpdateAssetSchema = CreateAssetSchema.partial();
 
+const canAccessCompany = (req: Request, companyId: string) =>
+  req.user?.role === Role.SUPERADMIN || req.user?.companyId === companyId;
+
 // GET /api/assets - List all assets
 assetRouter.get('/', async (req: Request, res: Response) => {
   try {
     const { status, category, locationId, search } = req.query;
 
-    const where: Prisma.AssetWhereInput = {};
+    const where: Prisma.AssetWhereInput = req.user?.role === Role.SUPERADMIN
+      ? {}
+      : { companyId: req.user!.companyId };
 
     if (status && status !== 'ALL') {
       where.status = status as AssetStatus;
@@ -89,6 +94,10 @@ assetRouter.get('/:id', async (req: Request, res: Response) => {
 
     if (!asset) {
       return res.status(404).json({ error: 'Ativo não encontrado' });
+    }
+
+    if (!canAccessCompany(req, asset.companyId)) {
+      return res.status(403).json({ error: 'Acesso negado' });
     }
 
     return res.json(asset);
@@ -315,6 +324,7 @@ assetRouter.post('/onboard', async (req: Request, res: Response) => {
       name: peripheralResult.name,
       status: peripheralResult.status,
       ipAddress: peripheralResult.ipAddress || undefined,
+      companyId: peripheralResult.companyId,
     });
 
     // 6. Registrar no Log de Auditoria
@@ -356,7 +366,9 @@ assetRouter.post('/', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Dados inválidos', details: parsed.error.format() });
     }
 
-    let companyId = parsed.data.companyId;
+    let companyId = req.user?.role === Role.SUPERADMIN
+      ? parsed.data.companyId
+      : req.user!.companyId;
     if (!companyId) {
       const company = await prisma.company.findFirst();
       if (!company) {
@@ -422,7 +434,18 @@ assetRouter.patch('/:id', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Dados inválidos', details: parsed.error.format() });
     }
 
+    const existing = await prisma.asset.findUnique({ where: { id }, select: { companyId: true } });
+    if (!existing) {
+      return res.status(404).json({ error: 'Ativo não encontrado' });
+    }
+    if (!canAccessCompany(req, existing.companyId)) {
+      return res.status(403).json({ error: 'Acesso negado' });
+    }
+
     const updateData = { ...parsed.data };
+    if (req.user?.role !== Role.SUPERADMIN) {
+      delete updateData.companyId;
+    }
 
     if (updateData.imageUrl && !updateData.imageUrl.startsWith('/uploads/assets/')) {
       try {
@@ -451,6 +474,7 @@ assetRouter.patch('/:id', async (req: Request, res: Response) => {
         name: updated.name,
         status: updated.status,
         ipAddress: updated.ipAddress,
+        companyId: updated.companyId,
       });
     }
 
@@ -464,6 +488,13 @@ assetRouter.patch('/:id', async (req: Request, res: Response) => {
 assetRouter.delete('/:id', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
+    const existing = await prisma.asset.findUnique({ where: { id }, select: { companyId: true } });
+    if (!existing) {
+      return res.status(404).json({ error: 'Ativo não encontrado' });
+    }
+    if (!canAccessCompany(req, existing.companyId)) {
+      return res.status(403).json({ error: 'Acesso negado' });
+    }
     await prisma.asset.delete({ where: { id } });
     return res.status(204).send();
   } catch (error) {

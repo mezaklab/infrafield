@@ -61,7 +61,10 @@ function getEvolutionConfig() {
   const apiKey =
     process.env.EVOLUTION_API_KEY ||
     process.env.WHATSAPP_TOKEN ||
-    'infrafield_secret_key';
+    '';
+  if (!apiKey) {
+    throw new Error('EVOLUTION_API_KEY ou WHATSAPP_TOKEN não configurado.');
+  }
   return { instance, apiKey };
 }
 

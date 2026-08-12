@@ -16,15 +16,23 @@ import bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
 
+function requiredSeedSecret(name: string): string {
+  const value = process.env[name]?.trim();
+  if (!value || value.length < 8) {
+    throw new Error(`${name} deve estar definido com pelo menos 8 caracteres antes de executar o seed.`);
+  }
+  return value;
+}
+
 async function main() {
   console.log('🌱 Starting InfraField v0.4 Database Seeding...');
   const HASH_ROUNDS = 10;
-  const superadminPasswordHash  = await bcrypt.hash('191003',    HASH_ROUNDS);
-  const adminPasswordHash       = await bcrypt.hash('admin123',  HASH_ROUNDS);
-  const techPasswordHash        = await bcrypt.hash('tecnico123',HASH_ROUNDS);
-  const techSimplePasswordHash  = await bcrypt.hash('123',       HASH_ROUNDS);
-  const managerPasswordHash     = await bcrypt.hash('gestor123', HASH_ROUNDS);
-  const viewerPasswordHash      = await bcrypt.hash('viewer123', HASH_ROUNDS);
+  const superadminPasswordHash = await bcrypt.hash(requiredSeedSecret('SEED_SUPERADMIN_PASSWORD'), HASH_ROUNDS);
+  const adminPasswordHash = await bcrypt.hash(requiredSeedSecret('SEED_ADMIN_PASSWORD'), HASH_ROUNDS);
+  const techPasswordHash = await bcrypt.hash(requiredSeedSecret('SEED_TECH_PASSWORD'), HASH_ROUNDS);
+  const techSimplePasswordHash = await bcrypt.hash(requiredSeedSecret('SEED_TECH_DEV_PASSWORD'), HASH_ROUNDS);
+  const managerPasswordHash = await bcrypt.hash(requiredSeedSecret('SEED_MANAGER_PASSWORD'), HASH_ROUNDS);
+  const viewerPasswordHash = await bcrypt.hash(requiredSeedSecret('SEED_VIEWER_PASSWORD'), HASH_ROUNDS);
 
   // Clean existing tables in reverse order of foreign keys
   await prisma.auditLog.deleteMany().catch(() => {});

@@ -95,6 +95,7 @@ export async function pollNetworkAssets(): Promise<void> {
             name: asset.name,
             status: newStatus,
             ipAddress: target,
+            companyId: asset.companyId,
           });
         }
       } catch (pingErr) {
@@ -151,6 +152,7 @@ export async function pollNetworkAssets(): Promise<void> {
             name: peripheral.name,
             status: newStatus,
             ipAddress: target,
+            companyId: peripheral.companyId,
           });
         }
       } catch (pingErr) {

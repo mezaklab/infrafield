@@ -20,6 +20,7 @@ import { sectorRouter } from './sector.routes';
 import { categoryRouter } from './category.routes';
 import { requireAuth, requireRole } from '../middlewares/auth.middleware';
 import { Role } from '@prisma/client';
+import { onboardingRateLimiter } from '../middlewares/rateLimit.middleware';
 
 export const routes = Router();
 
@@ -29,7 +30,7 @@ routes.use('/api/auth', authRouter);
 
 // /api/assets/onboard is intentionally public for PowerShell script ingestion.
 // It has its own audit log. All other /api/assets/* require auth.
-routes.post('/api/assets/onboard', assetRouter);
+routes.post('/api/assets/onboard', onboardingRateLimiter, assetRouter);
 
 // Locations GET is public so the /onboard page (unauthenticated) can load sectors.
 // Write operations (POST/PATCH/DELETE) require auth — enforced inside locationRouter.

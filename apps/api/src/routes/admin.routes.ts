@@ -1,10 +1,9 @@
 import { Router, Request, Response } from 'express';
-import { PrismaClient, Role } from '@prisma/client';
+import { Role } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
+import { prisma } from '../lib/prisma';
 
-// Use a single shared Prisma instance for the admin router
-const prisma = new PrismaClient();
 export const adminRouter = Router();
 
 // ─── Helper functions for username ──────────────────────────────────────────
@@ -43,21 +42,21 @@ function generateDefaultUsername(name: string, email?: string): string {
 // ─── Validation Schemas ───────────────────────────────────────────────────────
 
 const CreateUserSchema = z.object({
-  name: z.string().min(2, 'Nome é obrigatório'),
-  username: z.string().optional(),
-  email: z.string().email('E-mail inválido'),
-  password: z.string().min(4, 'Senha deve ter no mínimo 4 caracteres'),
+  name: z.string().trim().min(2, 'Nome é obrigatório').max(120),
+  username: z.string().trim().max(80).optional(),
+  email: z.string().trim().email('E-mail inválido').max(254),
+  password: z.string().min(8, 'Senha deve ter no mínimo 8 caracteres').max(128),
   role: z.nativeEnum(Role).optional().default(Role.TECHNICIAN),
   companyId: z.string().optional(),
   locationId: z.string().optional().nullable(),
 });
 
 const UpdateUserSchema = z.object({
-  name: z.string().min(2).optional(),
-  username: z.string().optional(),
-  email: z.string().email().optional(),
+  name: z.string().trim().min(2).max(120).optional(),
+  username: z.string().trim().max(80).optional(),
+  email: z.string().trim().email().max(254).optional(),
   role: z.nativeEnum(Role).optional(),
-  password: z.string().min(4).optional(),
+  password: z.string().min(8).max(128).optional(),
   locationId: z.string().optional().nullable(),
 });
 

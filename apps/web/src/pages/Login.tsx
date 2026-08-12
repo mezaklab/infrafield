@@ -29,8 +29,13 @@ export const Login: React.FC = () => {
   };
 
   const fillDemo = (role: 'admin' | 'tech') => {
-    if (role === 'admin') { setUsername('superadmin.geral'); setPassword('191003'); }
-    else                  { setUsername('carlos.tecnico'); setPassword('123'); }
+    if (role === 'admin') {
+      setUsername(import.meta.env.VITE_DEMO_ADMIN_USERNAME || '');
+      setPassword(import.meta.env.VITE_DEMO_ADMIN_PASSWORD || '');
+    } else {
+      setUsername(import.meta.env.VITE_DEMO_TECH_USERNAME || '');
+      setPassword(import.meta.env.VITE_DEMO_TECH_PASSWORD || '');
+    }
     setError(null);
   };
 
@@ -125,28 +130,29 @@ export const Login: React.FC = () => {
           </button>
         </form>
 
-        {/* Quick demo access */}
-        <div className="mt-5 space-y-2">
-          <p className="text-center text-[11px] text-slate-500 uppercase tracking-wider font-bold">Acesso rápido (demonstração)</p>
-          <div className="grid grid-cols-2 gap-2">
-            <button
-              type="button"
-              onClick={() => fillDemo('admin')}
-              className="flex items-center justify-center gap-2 px-3 py-2 bg-slate-800/60 hover:bg-slate-800 border border-slate-700 hover:border-cyan-500/40 text-xs font-semibold text-slate-300 hover:text-cyan-400 rounded-xl transition-all cursor-pointer"
-            >
-              <Shield className="w-3.5 h-3.5 text-cyan-400" />
-              Admin / Gestor
-            </button>
-            <button
-              type="button"
-              onClick={() => fillDemo('tech')}
-              className="flex items-center justify-center gap-2 px-3 py-2 bg-slate-800/60 hover:bg-slate-800 border border-slate-700 hover:border-amber-500/40 text-xs font-semibold text-slate-300 hover:text-amber-400 rounded-xl transition-all cursor-pointer"
-            >
-              <Wrench className="w-3.5 h-3.5 text-amber-400" />
-              Técnico de Campo
-            </button>
+        {import.meta.env.DEV && (
+          <div className="mt-5 space-y-2">
+            <p className="text-center text-[11px] text-slate-500 uppercase tracking-wider font-bold">Acesso rápido (demonstração)</p>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => fillDemo('admin')}
+                className="flex items-center justify-center gap-2 px-3 py-2 bg-slate-800/60 hover:bg-slate-800 border border-slate-700 hover:border-cyan-500/40 text-xs font-semibold text-slate-300 hover:text-cyan-400 rounded-xl transition-all cursor-pointer"
+              >
+                <Shield className="w-3.5 h-3.5 text-cyan-400" />
+                Admin / Gestor
+              </button>
+              <button
+                type="button"
+                onClick={() => fillDemo('tech')}
+                className="flex items-center justify-center gap-2 px-3 py-2 bg-slate-800/60 hover:bg-slate-800 border border-slate-700 hover:border-amber-500/40 text-xs font-semibold text-slate-300 hover:text-amber-400 rounded-xl transition-all cursor-pointer"
+              >
+                <Wrench className="w-3.5 h-3.5 text-amber-400" />
+                Técnico de Campo
+              </button>
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Footer badge */}
         <div className="mt-6 pt-4 border-t border-slate-800/60 flex items-center justify-center gap-2 text-[11px] text-slate-500">

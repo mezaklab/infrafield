@@ -1,8 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { Role } from '@prisma/client';
-
-const JWT_SECRET = process.env.JWT_SECRET || 'infrafield-secret-change-in-production';
+import { JWT_AUDIENCE, JWT_ISSUER, JWT_SECRET } from '../config/security';
 
 export interface JwtPayload {
   userId: string;
@@ -32,9 +31,21 @@ export function requireAuth(req: Request, res: Response, next: NextFunction): vo
     return;
   }
 
-  const token = authHeader.split(' ')[1];
+  const token = authHeader.slice(7).trim();
+  if (!token) {
+    res.status(401).json({ error: 'Token de autenticação inválido.' });
+    return;
+  }
+
   try {
-    const decoded = jwt.verify(token, JWT_SECRET) as JwtPayload;
+    const decoded = jwt.verify(token, JWT_SECRET, {
+      algorithms: ['HS256'],
+      issuer: JWT_ISSUER,
+      audience: JWT_AUDIENCE,
+    }) as JwtPayload;
+    if (!decoded.userId || !decoded.companyId || !decoded.role || !decoded.email) {
+      throw new Error('Payload JWT incompleto.');
+    }
     req.user = decoded;
     next();
   } catch (err) {

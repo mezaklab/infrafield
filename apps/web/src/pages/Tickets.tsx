@@ -137,12 +137,12 @@ export const Tickets: React.FC<TicketsProps> = ({ isCreateOpen = false, onCloseC
     const handleTicketCreated = () => fetchTicketsData();
     const handleTicketUpdated = () => fetchTicketsData();
 
-    socket.on('ticket_created', handleTicketCreated);
-    socket.on('ticket_updated', handleTicketUpdated);
+    socket.on('ticketCreated', handleTicketCreated);
+    socket.on('ticketUpdated', handleTicketUpdated);
 
     return () => {
-      socket.off('ticket_created', handleTicketCreated);
-      socket.off('ticket_updated', handleTicketUpdated);
+      socket.off('ticketCreated', handleTicketCreated);
+      socket.off('ticketUpdated', handleTicketUpdated);
     };
   }, [fetchTicketsData]);
 

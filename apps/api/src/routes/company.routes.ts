@@ -1,6 +1,8 @@
 import { Router, Request, Response } from 'express';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma';
+import { Role } from '@prisma/client';
+import { requireRole } from '../middlewares/auth.middleware';
 
 export const companyRouter = Router();
 
@@ -10,9 +12,10 @@ const CreateCompanySchema = z.object({
 });
 
 // GET /api/companies - List companies
-companyRouter.get('/', async (_req: Request, res: Response) => {
+companyRouter.get('/', async (req: Request, res: Response) => {
   try {
     const companies = await prisma.company.findMany({
+      where: req.user?.role === Role.SUPERADMIN ? {} : { id: req.user!.companyId },
       include: {
         _count: {
           select: { locations: true, assets: true, visits: true },
@@ -27,7 +30,7 @@ companyRouter.get('/', async (_req: Request, res: Response) => {
 });
 
 // POST /api/companies - Create company
-companyRouter.post('/', async (req: Request, res: Response) => {
+companyRouter.post('/', requireRole([Role.SUPERADMIN]), async (req: Request, res: Response) => {
   try {
     const parsed = CreateCompanySchema.safeParse(req.body);
     if (!parsed.success) {

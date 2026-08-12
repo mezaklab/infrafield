@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma';
-import { AssetStatus, PeripheralCategory, PeripheralSubcategory, Prisma } from '@prisma/client';
+import { AssetStatus, PeripheralCategory, PeripheralSubcategory, Prisma, Role } from '@prisma/client';
 import { emitAssetStatusUpdate } from '../services/websocket.service';
 
 export const peripheralRouter = Router();
@@ -29,9 +29,15 @@ const CreatePeripheralSchema = z.object({
 
 const UpdatePeripheralSchema = CreatePeripheralSchema.partial();
 
+const canAccessCompany = (req: Request, companyId: string) =>
+  req.user?.role === Role.SUPERADMIN || req.user?.companyId === companyId;
+
 // GET /api/peripherals/stats - Statistics breakdown
-peripheralRouter.get('/stats', async (_req: Request, res: Response) => {
+peripheralRouter.get('/stats', async (req: Request, res: Response) => {
   try {
+    const tenantWhere: Prisma.PeripheralWhereInput = req.user?.role === Role.SUPERADMIN
+      ? {}
+      : { companyId: req.user!.companyId };
     const [
       total,
       computador,
@@ -42,14 +48,14 @@ peripheralRouter.get('/stats', async (_req: Request, res: Response) => {
       monitor,
       operational,
     ] = await Promise.all([
-      prisma.peripheral.count(),
-      prisma.peripheral.count({ where: { category: PeripheralCategory.COMPUTADOR } }),
-      prisma.peripheral.count({ where: { subcategory: PeripheralSubcategory.DESKTOP } }),
-      prisma.peripheral.count({ where: { subcategory: PeripheralSubcategory.NOTEBOOK } }),
-      prisma.peripheral.count({ where: { category: PeripheralCategory.IMPRESSORA } }),
-      prisma.peripheral.count({ where: { category: PeripheralCategory.SCANNER } }),
-      prisma.peripheral.count({ where: { category: PeripheralCategory.MONITOR } }),
-      prisma.peripheral.count({ where: { status: AssetStatus.OPERATIONAL } }),
+      prisma.peripheral.count({ where: tenantWhere }),
+      prisma.peripheral.count({ where: { ...tenantWhere, category: PeripheralCategory.COMPUTADOR } }),
+      prisma.peripheral.count({ where: { ...tenantWhere, subcategory: PeripheralSubcategory.DESKTOP } }),
+      prisma.peripheral.count({ where: { ...tenantWhere, subcategory: PeripheralSubcategory.NOTEBOOK } }),
+      prisma.peripheral.count({ where: { ...tenantWhere, category: PeripheralCategory.IMPRESSORA } }),
+      prisma.peripheral.count({ where: { ...tenantWhere, category: PeripheralCategory.SCANNER } }),
+      prisma.peripheral.count({ where: { ...tenantWhere, category: PeripheralCategory.MONITOR } }),
+      prisma.peripheral.count({ where: { ...tenantWhere, status: AssetStatus.OPERATIONAL } }),
     ]);
 
     return res.json({
@@ -77,7 +83,9 @@ peripheralRouter.get('/', async (req: Request, res: Response) => {
   try {
     const { status, category, subcategory, locationId, search } = req.query;
 
-    const where: Prisma.PeripheralWhereInput = {};
+    const where: Prisma.PeripheralWhereInput = req.user?.role === Role.SUPERADMIN
+      ? {}
+      : { companyId: req.user!.companyId };
 
     if (status && status !== 'ALL') {
       where.status = status as AssetStatus;
@@ -142,6 +150,10 @@ peripheralRouter.get('/:id', async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'Periférico / Ativo de informática não encontrado' });
     }
 
+    if (!canAccessCompany(req, item.companyId)) {
+      return res.status(403).json({ error: 'Acesso negado' });
+    }
+
     return res.json(item);
   } catch (error) {
     return res.status(500).json({ error: 'Erro ao buscar item' });
@@ -156,7 +168,9 @@ peripheralRouter.post('/', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Dados inválidos', details: parsed.error.format() });
     }
 
-    let companyId = parsed.data.companyId;
+    let companyId = req.user?.role === Role.SUPERADMIN
+      ? parsed.data.companyId
+      : req.user!.companyId;
     if (!companyId) {
       const company = await prisma.company.findFirst();
       if (!company) {
@@ -213,7 +227,18 @@ peripheralRouter.patch('/:id', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Dados inválidos', details: parsed.error.format() });
     }
 
+    const existing = await prisma.peripheral.findUnique({ where: { id }, select: { companyId: true } });
+    if (!existing) {
+      return res.status(404).json({ error: 'Periférico / Ativo de informática não encontrado' });
+    }
+    if (!canAccessCompany(req, existing.companyId)) {
+      return res.status(403).json({ error: 'Acesso negado' });
+    }
+
     const updateData: Prisma.PeripheralUpdateInput = { ...parsed.data };
+    if (req.user?.role !== Role.SUPERADMIN) {
+      delete updateData.company;
+    }
     if (updateData.category && updateData.category !== PeripheralCategory.COMPUTADOR) {
       updateData.subcategory = null;
     }
@@ -234,6 +259,7 @@ peripheralRouter.patch('/:id', async (req: Request, res: Response) => {
         name: updated.name,
         status: updated.status,
         ipAddress: updated.ipAddress || undefined,
+        companyId: updated.companyId,
       });
     }
 
@@ -248,6 +274,13 @@ peripheralRouter.patch('/:id', async (req: Request, res: Response) => {
 peripheralRouter.delete('/:id', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
+    const existing = await prisma.peripheral.findUnique({ where: { id }, select: { companyId: true } });
+    if (!existing) {
+      return res.status(404).json({ error: 'Periférico / Ativo de informática não encontrado' });
+    }
+    if (!canAccessCompany(req, existing.companyId)) {
+      return res.status(403).json({ error: 'Acesso negado' });
+    }
     await prisma.peripheral.delete({ where: { id } });
     return res.status(204).send();
   } catch (error) {

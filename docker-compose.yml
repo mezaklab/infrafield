@@ -5,7 +5,7 @@ services:
     restart: always
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-infrafield_user}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-infrafield_password}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Defina POSTGRES_PASSWORD no arquivo .env}
       POSTGRES_DB: ${POSTGRES_DB:-infrafield_db}
     ports:
       - "${POSTGRES_PORT:-5432}:5432"
@@ -28,12 +28,12 @@ services:
     environment:
       SERVER_URL: ${EVOLUTION_SERVER_URL:-http://localhost:8080}
       AUTHENTICATION_TYPE: apikey
-      AUTHENTICATION_API_KEY: ${WHATSAPP_TOKEN:-infrafield_secret_key}
+      AUTHENTICATION_API_KEY: ${WHATSAPP_TOKEN:?Defina WHATSAPP_TOKEN no arquivo .env}
       AUTHENTICATION_EXPOSE_IN_FETCH_INSTANCES: "true"
       # Armazenamento de sessão WhatsApp (persistência entre restarts)
       DATABASE_ENABLED: "true"
       DATABASE_PROVIDER: "postgresql"
-      DATABASE_CONNECTION_URI: "postgresql://infrafield_user:infrafield_password@infrafield-postgres:5432/infrafield_db?schema=public"
+      DATABASE_CONNECTION_URI: "postgresql://${POSTGRES_USER:-infrafield_user}:${POSTGRES_PASSWORD:?Defina POSTGRES_PASSWORD no arquivo .env}@infrafield-postgres:5432/${POSTGRES_DB:-infrafield_db}?schema=public"
       # Esta instalacao nao possui Redis. O default da Evolution v2 tenta
       # localhost:6379 continuamente e bloqueia/atrasa o envio de mensagens.
       CACHE_REDIS_ENABLED: "false"

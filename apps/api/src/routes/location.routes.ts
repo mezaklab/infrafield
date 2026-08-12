@@ -55,14 +55,16 @@ locationRouter.get('/', async (req: Request, res: Response) => {
 // ─── Protected writes — require valid JWT ────────────────────────────────────
 
 // POST /api/locations
-locationRouter.post('/', requireAuth, async (req: Request, res: Response) => {
+locationRouter.post('/', requireAuth, requireRole([Role.SUPERADMIN, Role.ADMIN, Role.MANAGER]), async (req: Request, res: Response) => {
   try {
     const parsed = LocationWriteSchema.safeParse(req.body);
     if (!parsed.success) {
       return res.status(400).json({ error: 'Dados inválidos', details: parsed.error.format() });
     }
 
-    let companyId = parsed.data.companyId;
+    let companyId = req.user?.role === Role.SUPERADMIN
+      ? parsed.data.companyId
+      : req.user!.companyId;
     if (!companyId) {
       const company = await prisma.company.findFirst();
       if (!company) {
@@ -72,6 +74,12 @@ locationRouter.post('/', requireAuth, async (req: Request, res: Response) => {
     }
 
     const parentId = parsed.data.parentId || parsed.data.parent_id || null;
+    if (parentId) {
+      const parent = await prisma.location.findUnique({ where: { id: parentId }, select: { companyId: true } });
+      if (!parent || parent.companyId !== companyId) {
+        return res.status(400).json({ error: 'Localização pai inválida para esta empresa' });
+      }
+    }
 
     const location = await prisma.location.create({
       data: {
@@ -96,7 +104,7 @@ locationRouter.post('/', requireAuth, async (req: Request, res: Response) => {
 });
 
 // PATCH /api/locations/:id
-locationRouter.patch('/:id', requireAuth, async (req: Request, res: Response) => {
+locationRouter.patch('/:id', requireAuth, requireRole([Role.SUPERADMIN, Role.ADMIN, Role.MANAGER]), async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const parsed = LocationPatchSchema.safeParse(req.body);
@@ -105,6 +113,19 @@ locationRouter.patch('/:id', requireAuth, async (req: Request, res: Response) =>
     }
 
     const parentId = parsed.data.parentId !== undefined ? parsed.data.parentId : (parsed.data.parent_id !== undefined ? parsed.data.parent_id : undefined);
+    const existing = await prisma.location.findUnique({ where: { id }, select: { companyId: true } });
+    if (!existing) {
+      return res.status(404).json({ error: 'Localização não encontrada' });
+    }
+    if (req.user?.role !== Role.SUPERADMIN && existing.companyId !== req.user!.companyId) {
+      return res.status(403).json({ error: 'Acesso negado' });
+    }
+    if (parentId) {
+      const parent = await prisma.location.findUnique({ where: { id: parentId }, select: { companyId: true } });
+      if (!parent || parent.companyId !== existing.companyId || parentId === id) {
+        return res.status(400).json({ error: 'Localização pai inválida para esta empresa' });
+      }
+    }
 
     const dataToUpdate: any = {
       name: parsed.data.name,
@@ -143,6 +164,13 @@ locationRouter.delete(
   async (req: Request, res: Response) => {
     try {
       const { id } = req.params;
+      const existing = await prisma.location.findUnique({ where: { id }, select: { companyId: true } });
+      if (!existing) {
+        return res.status(404).json({ error: 'Localização não encontrada' });
+      }
+      if (req.user?.role !== Role.SUPERADMIN && existing.companyId !== req.user!.companyId) {
+        return res.status(403).json({ error: 'Acesso negado' });
+      }
       await prisma.location.delete({ where: { id } });
       return res.json({ success: true, message: 'Localização removida com sucesso' });
     } catch (error) {
