@@ -171,6 +171,18 @@ locationRouter.delete(
       if (req.user?.role !== Role.SUPERADMIN && existing.companyId !== req.user!.companyId) {
         return res.status(403).json({ error: 'Acesso negado' });
       }
+      const [ticketCount, assetCount, peripheralCount, visitCount] = await Promise.all([
+        (prisma.ticket as any).count({ where: { locationId: id } }),
+        prisma.asset.count({ where: { locationId: id } }),
+        prisma.peripheral.count({ where: { locationId: id } }),
+        prisma.visit.count({ where: { locationId: id } }),
+      ]);
+      const relationCount = ticketCount + assetCount + peripheralCount + visitCount;
+      if (relationCount > 0) {
+        return res.status(409).json({
+          error: `Esta localização possui vínculos (${ticketCount} chamado(s), ${assetCount + peripheralCount} ativo(s) e ${visitCount} vistoria(s)) e não pode ser excluída.`,
+        });
+      }
       await prisma.location.delete({ where: { id } });
       return res.json({ success: true, message: 'Localização removida com sucesso' });
     } catch (error) {

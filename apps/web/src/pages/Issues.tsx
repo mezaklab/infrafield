@@ -187,7 +187,7 @@ export const Issues: React.FC = () => {
 
           <button
             onClick={() => setIsModalOpen(true)}
-            className="flex items-center gap-2 bg-gradient-to-r from-rose-500 to-amber-600 hover:from-rose-400 hover:to-amber-500 text-white text-xs font-semibold px-4 py-2.5 rounded-xl shadow-lg shadow-rose-500/20 transition-all"
+            className="if-button-critical min-h-10 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold"
           >
             <Plus className="w-4 h-4" /> Registrar Não Conformidade
           </button>
@@ -309,8 +309,8 @@ export const Issues: React.FC = () => {
 
       {/* New Issue Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 max-w-md w-full shadow-2xl relative">
+        <div className="responsive-modal-backdrop">
+          <div className="responsive-modal-panel max-w-md relative">
             <button
               onClick={() => setIsModalOpen(false)}
               className="absolute top-5 right-5 p-2 text-slate-400 hover:text-white rounded-xl bg-slate-800"

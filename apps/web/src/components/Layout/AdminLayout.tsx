@@ -14,9 +14,12 @@ import {
   Activity,
   ChevronRight,
   Building2
+  ,KeyRound
 } from 'lucide-react';
 import { AdminTabType } from '../../types';
 import { useAuth } from '../../contexts/AuthContext';
+import { ThemeToggle } from './ThemeToggle';
+import { PanelSwitchButton } from '../ui/PanelSwitchButton';
 
 interface AdminLayoutProps {
   children: React.ReactNode;
@@ -35,7 +38,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
   onLogout,
   onRefresh,
 }) => {
-  const { user, isSuperAdmin } = useAuth();
+  const { user, isSuperAdmin, hasPermission } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const navItems = [
@@ -52,6 +55,13 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
       path: '/admin/users',
       icon: Users,
       description: 'Gestão de usuários e permissões',
+    },
+    {
+      id: 'roles' as AdminTabType,
+      label: 'Cargos e Permissões',
+      path: '/admin/roles',
+      icon: KeyRound,
+      description: 'Perfis granulares e políticas RBAC',
     },
     {
       id: 'audit-logs' as AdminTabType,
@@ -74,7 +84,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
       icon: SettingsIcon,
       description: 'Parâmetros e políticas globais',
     },
-  ];
+  ].filter((item) => item.id !== 'roles' || hasPermission('roles.view'));
 
   const getPageInfo = () => {
     switch (activeAdminTab) {
@@ -92,6 +102,11 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
         return {
           title: 'Logs de Auditoria & Trilha de Eventos',
           subtitle: 'Registros de segurança e auditoria de ações no sistema',
+        };
+      case 'roles':
+        return {
+          title: 'Cargos e Permissões',
+          subtitle: 'Perfis de acesso aplicados pela API e associados aos usuários',
         };
       case 'locations':
         return {
@@ -119,9 +134,9 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
   };
 
   return (
-    <div className="flex min-h-screen bg-slate-950 text-slate-100 font-sans">
+    <div className="admin-shell flex min-h-dvh bg-slate-950 text-slate-100 font-sans overflow-x-clip">
       {/* Desktop Sidebar Dedicated to Backoffice */}
-      <aside className="hidden lg:flex flex-col w-72 bg-slate-900/90 backdrop-blur-xl border-r border-indigo-900/40 h-screen sticky top-0 p-4 select-none z-30 shadow-2xl">
+      <aside className="surface-elevated hidden lg:flex flex-col w-72 bg-slate-900/90 backdrop-blur-xl border-r border-indigo-900/40 h-screen sticky top-0 p-4 select-none z-30 shadow-2xl">
         {/* Backoffice Brand Header */}
         <div className="flex items-center gap-3 px-3 py-4 mb-6 border-b border-indigo-900/40">
           <div className="w-11 h-11 rounded-xl bg-gradient-to-tr from-purple-600 via-indigo-600 to-cyan-500 flex items-center justify-center shadow-lg shadow-indigo-500/30 text-white font-extrabold ring-1 ring-purple-400/30">
@@ -130,7 +145,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
           <div>
             <div className="flex items-center gap-1.5">
               <h1 className="font-black text-lg text-white tracking-tight">InfraField</h1>
-              <span className="text-[10px] font-extrabold uppercase bg-purple-500/20 text-purple-300 border border-purple-500/40 px-2 py-0.5 rounded-full shadow-sm">
+              <span className="ui-badge text-[10px] font-extrabold uppercase bg-purple-500/20 text-purple-300 border border-purple-500/40 px-2 py-0.5 rounded-full shadow-sm">
                 BACKOFFICE
               </span>
             </div>
@@ -155,18 +170,18 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
                 onClick={() => handleTabClick(item.id, item.path)}
                 className={`w-full flex items-center justify-between px-3.5 py-3 rounded-xl font-medium text-sm transition-all duration-200 group text-left ${
                   isActive
-                    ? 'bg-gradient-to-r from-purple-900/50 via-indigo-900/40 to-slate-900 text-purple-200 border border-purple-500/40 shadow-lg shadow-purple-950/50 ring-1 ring-purple-500/20'
+                    ? 'bg-[var(--if-admin-accent-soft)] text-purple-200 border border-purple-500/30 shadow-sm'
                     : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 border border-transparent'
                 }`}
               >
                 <div className="flex items-center gap-3 min-w-0">
-                  <div className={`p-2 rounded-lg transition-colors ${
+                  <div className={`icon-box h-8 w-8 rounded-lg transition-colors ${
                     isActive ? 'bg-purple-600 text-white shadow-md shadow-purple-600/40' : 'bg-slate-800 text-slate-400 group-hover:text-purple-300 group-hover:bg-slate-700'
                   }`}>
                     <Icon className="w-4 h-4 shrink-0" />
                   </div>
                   <div className="flex flex-col truncate">
-                    <span className={`text-sm font-semibold truncate ${isActive ? 'text-white' : ''}`}>
+                    <span className={`text-sm font-semibold truncate ${isActive ? 'if-text' : ''}`}>
                       {item.label}
                     </span>
                     <span className="text-[11px] text-slate-400 font-normal truncate opacity-80">
@@ -182,16 +197,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
 
         {/* Switch to Operational NOC Navigation */}
         <div className="my-4 pt-4 border-t border-indigo-900/30">
-          <button
-            onClick={onNavigateToApp}
-            className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold text-cyan-300 bg-cyan-950/40 hover:bg-cyan-900/60 border border-cyan-500/30 transition-all shadow-md group"
-          >
-            <div className="flex items-center gap-2">
-              <ArrowLeft className="w-4 h-4 text-cyan-400 group-hover:-translate-x-1 transition-transform" />
-              <span>Painel Operacional NOC</span>
-            </div>
-            <span className="text-[10px] bg-cyan-500/20 text-cyan-200 px-1.5 py-0.5 rounded font-mono">Campo</span>
-          </button>
+          <PanelSwitchButton destination="operational" label="Painel Operacional NOC" onClick={onNavigateToApp} />
         </div>
 
         {/* Admin User Profile info & Logout */}
@@ -226,8 +232,9 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
       {/* Main Backoffice Content Container */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Header Bar */}
-        <header className="bg-slate-900/80 backdrop-blur-md border-b border-indigo-900/40 px-4 md:px-8 py-4 sticky top-0 z-20 flex items-center justify-between">
+        <header className="surface-ambient bg-slate-900/90 backdrop-blur-md border-b border-indigo-900/40 px-3 sm:px-5 md:px-8 py-3 sm:py-4 sticky top-0 z-20 flex items-center justify-between safe-header gap-2">
           <div className="flex items-center gap-3">
+            <ThemeToggle />
             {/* Mobile drawer toggle */}
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
@@ -242,7 +249,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
                 <span>&gt;</span>
                 <span className="capitalize">{activeAdminTab}</span>
               </div>
-              <h2 className="text-lg md:text-xl font-extrabold text-white tracking-tight flex items-center gap-2">
+              <h2 className="text-base md:text-xl font-extrabold text-white tracking-tight flex items-center gap-2 truncate">
                 {pageInfo.title}
               </h2>
               <p className="text-xs text-slate-400 hidden md:block">{pageInfo.subtitle}</p>
@@ -267,13 +274,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
               </button>
             )}
 
-            <button
-              onClick={onNavigateToApp}
-              className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-cyan-300 bg-cyan-950/60 hover:bg-cyan-900/80 border border-cyan-500/30 transition-all"
-            >
-              <ArrowLeft className="w-3.5 h-3.5" />
-              <span>Painel de Campo</span>
-            </button>
+            <PanelSwitchButton destination="operational" label="Painel de Campo" compact className="hidden sm:inline-flex" onClick={onNavigateToApp} />
           </div>
         </header>
 
@@ -346,7 +347,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
         )}
 
         {/* Page Content */}
-        <main className="flex-1 p-4 md:p-8 max-w-7xl w-full mx-auto">
+        <main className="flex-1 px-3 py-4 sm:p-5 md:p-8 max-w-7xl w-full mx-auto">
           {children}
         </main>
       </div>

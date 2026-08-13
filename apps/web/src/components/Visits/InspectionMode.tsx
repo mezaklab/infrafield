@@ -678,8 +678,8 @@ export const InspectionMode: React.FC<InspectionModeProps> = ({ visitId, onBack 
 
       {/* Audit Summary Modal */}
       {showSummaryModal && summary && (
-        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 max-w-lg w-full shadow-2xl relative">
+        <div className="responsive-modal-backdrop">
+          <div className="responsive-modal-panel max-w-lg relative">
             <button
               onClick={() => setShowSummaryModal(false)}
               className="absolute top-5 right-5 p-2 text-slate-400 hover:text-white rounded-xl bg-slate-800"
@@ -707,7 +707,7 @@ export const InspectionMode: React.FC<InspectionModeProps> = ({ visitId, onBack 
                 <div style={{ width: `${summary.totals.conciliationRate}%` }} className="bg-emerald-500 h-full"></div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3 pt-2 text-xs">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 text-xs">
                 <div className="bg-slate-900 p-3 rounded-xl border border-slate-800">
                   <span className="text-slate-400 block text-[11px]">Encontrados / Confirmados</span>
                   <span className="text-lg font-bold text-emerald-400">{summary.totals.encontrados}</span>
@@ -747,8 +747,8 @@ export const InspectionMode: React.FC<InspectionModeProps> = ({ visitId, onBack 
 
       {/* New Issue Modal inside Visit */}
       {showNewIssueModal && (
-        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 max-w-md w-full shadow-2xl relative">
+        <div className="responsive-modal-backdrop">
+          <div className="responsive-modal-panel max-w-md relative">
             <button
               onClick={() => setShowNewIssueModal(false)}
               className="absolute top-5 right-5 p-2 text-slate-400 hover:text-white rounded-xl bg-slate-800"
@@ -824,8 +824,8 @@ export const InspectionMode: React.FC<InspectionModeProps> = ({ visitId, onBack 
 
       {/* New Unmapped Asset Modal */}
       {showAddAssetModal && (
-        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 max-w-md w-full shadow-2xl relative">
+        <div className="responsive-modal-backdrop">
+          <div className="responsive-modal-panel max-w-md relative">
             <button
               onClick={() => setShowAddAssetModal(false)}
               className="absolute top-5 right-5 p-2 text-slate-400 hover:text-white rounded-xl bg-slate-800"

@@ -2,7 +2,7 @@ import { Server as HTTPServer } from 'http';
 import { Server as SocketIOServer } from 'socket.io';
 import jwt from 'jsonwebtoken';
 import { Role } from '@prisma/client';
-import { JWT_AUDIENCE, JWT_ISSUER, JWT_SECRET, getAllowedOrigins } from '../config/security';
+import { JWT_AUDIENCE, JWT_ISSUER, JWT_SECRET, getAllowedOrigins, isCorsOriginAllowed } from '../config/security';
 import type { JwtPayload } from '../middlewares/auth.middleware';
 
 let io: SocketIOServer | null = null;
@@ -12,6 +12,8 @@ export interface StatusUpdatedPayload {
   code: string;
   name: string;
   status: string;
+  monitoringStatus?: string;
+  latencyMs?: number | null;
   ipAddress?: string | null;
   timestamp?: string;
   companyId: string;
@@ -21,9 +23,13 @@ export interface StatusUpdatedPayload {
  * Inicializa o servidor Socket.io acoplado ao servidor HTTP do Express.
  */
 export function initWebSocketServer(server: HTTPServer): SocketIOServer {
+  const allowedOrigins = getAllowedOrigins();
   io = new SocketIOServer(server, {
     cors: {
-      origin: getAllowedOrigins(),
+      origin: (origin, callback) => {
+        const allowed = isCorsOriginAllowed(origin, { allowedOrigins });
+        callback(allowed ? null : new Error('Origem não permitida pelo CORS.'), allowed);
+      },
       methods: ['GET', 'POST', 'PUT', 'DELETE'],
     },
     maxHttpBufferSize: 1_000_000,

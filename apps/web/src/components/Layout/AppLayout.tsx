@@ -1,9 +1,10 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Sidebar } from './Sidebar';
 import { BottomNav } from './BottomNav';
 import { Header } from './Header';
 import { TabType } from '../../types';
 import type { PeripheralsSubTab } from './Sidebar';
+import { MobileDrawer } from './MobileDrawer';
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -12,6 +13,7 @@ interface AppLayoutProps {
   onLogout: () => void;
   onRefresh?: () => void;
   onOpenScanner?: () => void;
+  scannerOpen?: boolean;
   onNavigateToAdmin?: () => void;
   onOpenCreateTicket?: () => void;
   activePeripheralSub?: PeripheralsSubTab;
@@ -25,11 +27,13 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
   onLogout,
   onRefresh,
   onOpenScanner,
+  scannerOpen,
   onNavigateToAdmin,
   onOpenCreateTicket,
   activePeripheralSub,
   setActivePeripheralSub,
 }) => {
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const getTitle = () => {
     switch (activeTab) {
       case 'dashboard':
@@ -52,7 +56,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
   };
 
   return (
-    <div className="flex min-h-screen bg-slate-950 text-slate-100">
+    <div className="flex min-h-dvh bg-slate-950 text-slate-100 overflow-x-clip">
       {/* Sidebar for Desktop */}
       <Sidebar 
         activeTab={activeTab} 
@@ -66,8 +70,8 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
 
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col min-w-0 pb-20 md:pb-0">
-        <Header title={getTitle()} onRefresh={onRefresh} />
-        <main className="flex-1 p-4 md:p-8 max-w-7xl w-full mx-auto">
+        <Header title={getTitle()} onRefresh={onRefresh} onOpenMenu={() => setMobileMenuOpen(true)} />
+        <main className="flex-1 px-3 py-4 sm:p-5 lg:p-7 max-w-[1440px] w-full mx-auto">
           {children}
         </main>
       </div>
@@ -78,7 +82,9 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
         setActiveTab={setActiveTab}
         onLogout={onLogout}
         onOpenScanner={onOpenScanner}
+        scannerOpen={scannerOpen}
       />
+      <MobileDrawer open={mobileMenuOpen} onClose={() => setMobileMenuOpen(false)} activeTab={activeTab} onNavigate={setActiveTab} onAdmin={onNavigateToAdmin} onLogout={onLogout} />
     </div>
   );
 };

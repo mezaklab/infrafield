@@ -12,6 +12,8 @@ export interface StatusUpdatedPayload {
   code: string;
   name: string;
   status: 'OPERATIONAL' | 'MAINTENANCE' | 'CRITICAL' | 'INACTIVE';
+  monitoringStatus?: 'ONLINE' | 'DEGRADED' | 'UNKNOWN' | 'OFFLINE';
+  latencyMs?: number | null;
   ipAddress?: string | null;
   timestamp?: string;
 }

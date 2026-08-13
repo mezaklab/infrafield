@@ -10,12 +10,17 @@ import crypto from 'crypto';
 
 
 export const ticketRouter = Router();
+// The repository may have an older generated client until deployment runs
+// `prisma generate`; keep this delegate localized while schema migrations are pending.
+const ticketStore = prisma.ticket as any;
 
 // Validation Schemas
 const CreateTicketSchema = z.object({
   subject: z.string().trim().min(3, 'Assunto é obrigatório').max(160),
   description: z.string().trim().min(5, 'Descrição detalhada é obrigatória').max(5000),
-  category: z.string().trim().max(100).optional().default('Outros'),
+  categoryId: z.string().uuid('Categoria inválida'),
+  sectorId: z.string().uuid('Setor inválido'),
+  // Kept for backwards compatibility with existing clients and old tickets.
   locationId: z.string().uuid('Localização inválida'),
   assetId: z.string().uuid('Ativo inválido').optional().nullable(),
   priority: z.nativeEnum(TicketPriority).optional().default(TicketPriority.MEDIA),
@@ -26,6 +31,9 @@ const UpdateTicketSchema = z.object({
   status: z.nativeEnum(TicketStatus).optional(),
   priority: z.nativeEnum(TicketPriority).optional(),
   assignedToId: z.string().uuid().optional().nullable(),
+  sectorId: z.string().uuid('Setor inválido').optional(),
+  locationId: z.string().uuid('Localização inválida').optional(),
+  categoryId: z.string().uuid('Categoria inválida').optional(),
 });
 
 const CreateMessageSchema = z.object({
@@ -68,6 +76,21 @@ ticketRouter.get('/technicians', async (req: Request, res: Response) => {
   }
 });
 
+// Any authenticated ticket author can list company locations when opening a ticket.
+ticketRouter.get('/locations', async (req: Request, res: Response) => {
+  try {
+    const locations = await prisma.location.findMany({
+      where: { companyId: req.user!.companyId },
+      select: { id: true, name: true, building: true, floor: true, room: true, parentId: true },
+      orderBy: { name: 'asc' },
+    });
+    return res.json(locations);
+  } catch (error) {
+    console.error('[TICKETS] GET /locations error:', error);
+    return res.status(500).json({ error: 'Erro ao carregar localidades.' });
+  }
+});
+
 // ─── GET /api/tickets/dashboard ───────────────────────────────────────────────
 ticketRouter.get('/dashboard', async (req: Request, res: Response) => {
   try {
@@ -93,14 +116,16 @@ ticketRouter.get('/dashboard', async (req: Request, res: Response) => {
       resolvedMonth,
       allTickets,
       resolvedTicketsList,
+      sectorGroups,
+      locationGroups,
     ] = await Promise.all([
-      prisma.ticket.count({
+      ticketStore.count({
         where: {
           ...baseWhere,
           status: { in: [TicketStatus.ABERTO, TicketStatus.EM_ATENDIMENTO, TicketStatus.AGUARDANDO_USUARIO] },
         },
       }),
-      prisma.ticket.count({
+      ticketStore.count({
         where: {
           ...baseWhere,
           OR: [
@@ -112,30 +137,40 @@ ticketRouter.get('/dashboard', async (req: Request, res: Response) => {
           ],
         },
       }),
-      prisma.ticket.count({
+      ticketStore.count({
         where: {
           ...baseWhere,
           status: TicketStatus.RESOLVIDO,
           updatedAt: { gte: thirtyDaysAgo },
         },
       }),
-      prisma.ticket.findMany({
+      ticketStore.findMany({
         where: baseWhere,
-        include: { location: { select: { name: true } } },
+        select: { subject: true, description: true, categoryId: true, status: true, createdAt: true, updatedAt: true },
       }),
-      prisma.ticket.findMany({
+      ticketStore.findMany({
         where: {
           ...baseWhere,
           status: TicketStatus.RESOLVIDO,
         },
         select: { createdAt: true, updatedAt: true },
       }),
+      ticketStore.groupBy({
+        by: ['sectorId'],
+        where: { ...baseWhere, sectorId: { not: null } },
+        _count: { _all: true },
+      }),
+      ticketStore.groupBy({
+        by: ['locationId'],
+        where: { ...baseWhere, locationId: { not: null } },
+        _count: { _all: true },
+      }),
     ]);
 
     // 2. Average resolution time calculation
     let avgResolutionMinutes = 0;
     if (resolvedTicketsList.length > 0) {
-      const totalDiffMs = resolvedTicketsList.reduce((acc, t) => {
+      const totalDiffMs = resolvedTicketsList.reduce((acc: number, t: { createdAt: Date; updatedAt: Date }) => {
         const diffMs = new Date(t.updatedAt).getTime() - new Date(t.createdAt).getTime();
         return acc + (diffMs > 0 ? diffMs : 0);
       }, 0);
@@ -157,7 +192,7 @@ ticketRouter.get('/dashboard', async (req: Request, res: Response) => {
       evolutionMap[key] = { month: label, abertos: 0, solucionados: 0 };
     }
 
-    allTickets.forEach((t) => {
+    allTickets.forEach((t: { createdAt: Date; updatedAt: Date; status: TicketStatus; categoryId: string | null }) => {
       const createdDate = new Date(t.createdAt);
       const createdKey = `${createdDate.getFullYear()}-${createdDate.getMonth()}`;
       if (evolutionMap[createdKey]) {
@@ -175,48 +210,44 @@ ticketRouter.get('/dashboard', async (req: Request, res: Response) => {
 
     const evolution = Object.values(evolutionMap);
 
-    // 4. Sector / Location Distribution (Donut chart data)
-    const locationCounts: { [key: string]: number } = {};
-    allTickets.forEach((t) => {
-      const locName = t.location?.name || 'Geral / TI Central';
-      locationCounts[locName] = (locationCounts[locName] || 0) + 1;
-    });
-
+    // 4. Sector Distribution: only persisted Ticket.sectorId relations.
     const colors = ['#00f2fe', '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#64748b'];
-    const sectorDistribution = Object.entries(locationCounts).map(([name, value], idx) => ({
-      name,
-      value,
-      color: colors[idx % colors.length],
-    }));
-
-    // 5. Top 5 Equipment / Incident Types (Horizontal bar chart data)
-    const categoryKeywords = [
-      { category: 'Impressoras & Scanners', keywords: ['impressora', 'toner', 'papel', 'scanner', 'imprimir'] },
-      { category: 'Desktops & Notebooks', keywords: ['pc', 'desktop', 'notebook', 'computador', 'windows', 'lento'] },
-      { category: 'Rede, Wi-Fi & Switches', keywords: ['rede', 'wifi', 'wi-fi', 'internet', 'switch', 'sem conexao', 'ping'] },
-      { category: 'Servidores & Racks', keywords: ['servidor', 'datacenter', 'rack', 'virtual', 'backup'] },
-      { category: 'Sistemas & Software', keywords: ['sistema', 'senha', 'email', 'e-mail', 'login', 'acesso'] },
-    ];
-
-    const categoryCounts: { [key: string]: number } = {};
-    categoryKeywords.forEach((cat) => {
-      categoryCounts[cat.category] = 0;
+    const sectorIds = sectorGroups.flatMap((group: { sectorId: string | null }) => group.sectorId ? [group.sectorId] : []);
+    const sectorNames = await prisma.sector.findMany({
+      where: { id: { in: sectorIds } },
+      select: { id: true, name: true },
     });
-    categoryCounts['Outros / Gerais'] = 0;
+    const sectorNameById = new Map(sectorNames.map((sector) => [sector.id, sector.name]));
+    const sectorDistribution = sectorGroups.flatMap((group: { sectorId: string | null; _count: { _all: number } }, idx: number) => {
+      if (!group.sectorId) return [];
+      const name = sectorNameById.get(group.sectorId);
+      return name ? [{ name, value: group._count._all, color: colors[idx % colors.length] }] : [];
+    }).sort((a: { value: number }, b: { value: number }) => b.value - a.value);
 
-    allTickets.forEach((t) => {
-      const text = `${t.subject} ${t.description}`.toLowerCase();
-      let matched = false;
-      for (const cat of categoryKeywords) {
-        if (cat.keywords.some((kw) => text.includes(kw))) {
-          categoryCounts[cat.category] += 1;
-          matched = true;
-          break;
-        }
-      }
-      if (!matched) {
-        categoryCounts['Outros / Gerais'] += 1;
-      }
+    // Kept separate from sectors so future Helpdesk views never conflate
+    // organizational ownership with the physical site of the incident.
+    const locationIds = locationGroups.flatMap((group: { locationId: string | null }) => group.locationId ? [group.locationId] : []);
+    const locationNames = await prisma.location.findMany({
+      where: { id: { in: locationIds } },
+      select: { id: true, name: true },
+    });
+    const locationNameById = new Map(locationNames.map((location) => [location.id, location.name]));
+    const locationDistribution = locationGroups.flatMap((group: { locationId: string | null; _count: { _all: number } }, idx: number) => {
+      if (!group.locationId) return [];
+      const name = locationNameById.get(group.locationId);
+      return name ? [{ name, value: group._count._all, color: colors[idx % colors.length] }] : [];
+    }).sort((a: { value: number }, b: { value: number }) => b.value - a.value);
+
+    // 5. Categories selected and persisted on real tickets (no keyword inference).
+    const categoryCounts: { [key: string]: number } = {};
+    const categoryGroups = await ticketStore.groupBy({ by: ['categoryId'], where: { ...baseWhere, categoryId: { not: null } }, _count: { _all: true } });
+    const categoryIds = categoryGroups.flatMap((group: { categoryId: string | null }) => group.categoryId ? [group.categoryId] : []);
+    const categories = await prisma.category.findMany({ where: { id: { in: categoryIds } }, select: { id: true, name: true } });
+    const categoryNameById = new Map(categories.map((item) => [item.id, item.name]));
+    categoryGroups.forEach((group: { categoryId: string | null; _count: { _all: number } }) => {
+      if (!group.categoryId) return;
+      const name = categoryNameById.get(group.categoryId);
+      if (name) categoryCounts[name] = group._count._all;
     });
 
     const topIncidents = Object.entries(categoryCounts)
@@ -224,6 +255,7 @@ ticketRouter.get('/dashboard', async (req: Request, res: Response) => {
         equipment,
         count,
       }))
+      .filter((item) => item.count > 0)
       .sort((a, b) => b.count - a.count)
       .slice(0, 5);
 
@@ -232,15 +264,12 @@ ticketRouter.get('/dashboard', async (req: Request, res: Response) => {
         totalActive,
         overdueSla: criticalOverdue,
         resolvedMonth,
-        avgResolutionTime: avgResolutionTimeFormatted || '1h 45min',
+        avgResolutionTime: avgResolutionTimeFormatted,
       },
       charts: {
         evolution,
-        sectorDistribution: sectorDistribution.length > 0 ? sectorDistribution : [
-          { name: 'Datacenter Central', value: 4, color: '#00f2fe' },
-          { name: 'Almoxarifado', value: 3, color: '#3b82f6' },
-          { name: 'Suporte TI', value: 2, color: '#10b981' },
-        ],
+        sectorDistribution,
+        locationDistribution,
         topIncidents,
       },
     });
@@ -292,11 +321,13 @@ ticketRouter.get('/', async (req: Request, res: Response) => {
       ];
     }
 
-    const tickets = await prisma.ticket.findMany({
+    const tickets = await ticketStore.findMany({
       where,
       include: {
         author: { select: { id: true, name: true, email: true, role: true } },
         location: { select: { id: true, name: true, building: true, room: true } },
+        sector: { select: { id: true, name: true } },
+        categoryRef: { select: { id: true, name: true } },
         asset: { select: { id: true, name: true, code: true, category: true, assetTag: true } },
         assignedTo: { select: { id: true, name: true, email: true, role: true } },
         _count: { select: { messages: true } },
@@ -318,11 +349,13 @@ ticketRouter.get('/:id', async (req: Request, res: Response) => {
     const userRole = req.user!.role;
     const userId = req.user!.userId;
 
-    const ticket = await prisma.ticket.findUnique({
+    const ticket = await ticketStore.findUnique({
       where: { id },
       include: {
         author: { select: { id: true, name: true, email: true, role: true } },
         location: { select: { id: true, name: true, building: true, room: true } },
+        sector: { select: { id: true, name: true } },
+        categoryRef: { select: { id: true, name: true } },
         asset: { select: { id: true, name: true, code: true, category: true, assetTag: true } },
         assignedTo: { select: { id: true, name: true, email: true, role: true } },
         messages: {
@@ -362,23 +395,19 @@ ticketRouter.post('/', ticketCreationRateLimiter, async (req: Request, res: Resp
       return res.status(400).json({ error: 'Dados inválidos', details: parsed.error.format() });
     }
 
-    const { subject, description, category: bodyCategory, locationId: bodyLocationId, assetId, priority, attachments } = parsed.data;
+    const { subject, description, categoryId, sectorId, locationId: bodyLocationId, assetId, priority, attachments } = parsed.data;
     const authorId = req.user!.userId;
 
-    // Resolve locationId: body parameter or user's assigned location
-    let targetLocationId: string | null = bodyLocationId;
-    if (!targetLocationId) {
-      const user = await prisma.user.findUnique({
-        where: { id: authorId },
-        select: { locationId: true },
-      });
-      targetLocationId = user?.locationId || null;
-    }
-
     const companyId = req.user!.companyId;
-    const location = await prisma.location.findFirst({ where: { id: targetLocationId!, companyId } });
-    if (!location) {
-      return res.status(400).json({ error: 'Localização inválida para a empresa do usuário.' });
+    const sector = await prisma.sector.findUnique({ where: { id: sectorId } });
+    if (!sector) {
+      return res.status(400).json({ error: 'O setor selecionado não existe mais. Selecione outro setor.' });
+    }
+    const category = await prisma.category.findUnique({ where: { id: categoryId }, select: { id: true, name: true } });
+    if (!category) return res.status(400).json({ error: 'Categoria de atendimento inválida.' });
+    if (bodyLocationId) {
+      const location = await prisma.location.findFirst({ where: { id: bodyLocationId, companyId } });
+      if (!location) return res.status(400).json({ error: 'Localização inválida para a empresa do usuário.' });
     }
     if (assetId) {
       const asset = await prisma.asset.findFirst({ where: { id: assetId, companyId } });
@@ -389,15 +418,19 @@ ticketRouter.post('/', ticketCreationRateLimiter, async (req: Request, res: Resp
 
     // Create ticket & initial message inside a transaction
     const newTicket = await prisma.$transaction(async (tx) => {
-      const ticket = await tx.ticket.create({
+      const ticket = await (tx.ticket as any).create({
         data: {
           code,
           subject,
           description,
+          // Legacy display field kept in sync; categoryId remains the source of truth.
+          category: category.name,
+          categoryId,
           status: TicketStatus.ABERTO,
           priority,
           companyId,
-          locationId: targetLocationId,
+          sectorId,
+          locationId: bodyLocationId || null,
           assetId: assetId || null,
           authorId,
         },
@@ -416,11 +449,13 @@ ticketRouter.post('/', ticketCreationRateLimiter, async (req: Request, res: Resp
     });
 
     // Fetch complete newly created ticket with relations
-    const createdTicket = await prisma.ticket.findUnique({
+    const createdTicket = await ticketStore.findUnique({
       where: { id: newTicket.id },
       include: {
         author: { select: { id: true, name: true, email: true, role: true } },
         location: { select: { id: true, name: true, building: true, room: true } },
+        sector: { select: { id: true, name: true } },
+        categoryRef: { select: { id: true, name: true } },
         asset: { select: { id: true, name: true, code: true, category: true, assetTag: true } },
         assignedTo: { select: { id: true, name: true, email: true, role: true } },
         messages: {
@@ -443,7 +478,7 @@ ticketRouter.post('/', ticketCreationRateLimiter, async (req: Request, res: Resp
         subject: createdTicket.subject,
         description: createdTicket.description,
         priority: createdTicket.priority,
-        category: bodyCategory,
+        category: createdTicket.categoryRef?.name || 'Outros',
         author: createdTicket.author,
         location: createdTicket.location,
         asset: createdTicket.asset,
@@ -468,10 +503,10 @@ ticketRouter.patch('/:id', requireRole([Role.SUPERADMIN, Role.ADMIN, Role.MANAGE
       return res.status(400).json({ error: 'Dados inválidos', details: parsed.error.format() });
     }
 
-    const { status, priority, assignedToId } = parsed.data;
+    const { status, priority, assignedToId, sectorId, locationId, categoryId } = parsed.data;
     const updateData: any = {};
 
-    const existingTicket = await prisma.ticket.findUnique({ where: { id } });
+    const existingTicket = await ticketStore.findUnique({ where: { id } });
     if (!existingTicket) return res.status(404).json({ error: 'Chamado não encontrado.' });
     if (req.user!.role !== Role.SUPERADMIN && existingTicket.companyId !== req.user!.companyId) {
       return res.status(403).json({ error: 'Acesso negado a este chamado.' });
@@ -480,17 +515,35 @@ ticketRouter.patch('/:id', requireRole([Role.SUPERADMIN, Role.ADMIN, Role.MANAGE
       const assignee = await prisma.user.findFirst({ where: { id: assignedToId, companyId: existingTicket.companyId } });
       if (!assignee) return res.status(400).json({ error: 'Técnico inválido para este chamado.' });
     }
+    if (sectorId) {
+      const sector = await prisma.sector.findUnique({ where: { id: sectorId }, select: { id: true } });
+      if (!sector) return res.status(400).json({ error: 'O setor selecionado não existe mais.' });
+    }
+    if (locationId) {
+      const location = await prisma.location.findFirst({ where: { id: locationId, companyId: existingTicket.companyId }, select: { id: true } });
+      if (!location) return res.status(400).json({ error: 'Localização inválida para este chamado.' });
+    }
+    if (categoryId) {
+      const category = await prisma.category.findUnique({ where: { id: categoryId }, select: { id: true, name: true } });
+      if (!category) return res.status(400).json({ error: 'Categoria de atendimento inválida.' });
+      updateData.category = category.name;
+    }
 
     if (status) updateData.status = status;
     if (priority) updateData.priority = priority;
     if (assignedToId !== undefined) updateData.assignedToId = assignedToId || null;
+    if (sectorId !== undefined) updateData.sectorId = sectorId;
+    if (locationId !== undefined) updateData.locationId = locationId;
+    if (categoryId !== undefined) updateData.categoryId = categoryId;
 
-    const updatedTicket = await prisma.ticket.update({
+    const updatedTicket = await ticketStore.update({
       where: { id },
       data: updateData,
       include: {
         author: { select: { id: true, name: true, email: true, role: true } },
         location: { select: { id: true, name: true, building: true, room: true } },
+        sector: { select: { id: true, name: true } },
+        categoryRef: { select: { id: true, name: true } },
         assignedTo: { select: { id: true, name: true, email: true, role: true } },
       },
     });
@@ -524,7 +577,7 @@ ticketRouter.post('/:id/messages', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Insira o texto da mensagem ou envie um anexo.' });
     }
 
-    const ticket = await prisma.ticket.findUnique({ where: { id } });
+    const ticket = await ticketStore.findUnique({ where: { id } });
     if (!ticket) {
       return res.status(404).json({ error: 'Chamado não encontrado.' });
     }

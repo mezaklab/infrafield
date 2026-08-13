@@ -222,7 +222,7 @@ export const OnboardStandalone: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center p-4 md:p-8 font-sans">
+    <div className="min-h-dvh bg-slate-950 text-slate-100 flex items-center justify-center p-3 sm:p-4 md:p-8 font-sans overflow-x-clip">
       <div className="w-full max-w-3xl space-y-6">
         {/* Brand Header Banner */}
         <div className="text-center space-y-2">
@@ -395,7 +395,7 @@ export const OnboardStandalone: React.FC = () => {
                 {/* Tipo (Desktop / Notebook) */}
                 <div className="space-y-1.5 md:col-span-2">
                   <label className="text-xs font-bold text-slate-300">Tipo de Equipamento *</label>
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <button
                       type="button"
                       onClick={() => setType('DESKTOP')}
@@ -430,7 +430,7 @@ export const OnboardStandalone: React.FC = () => {
                     <Briefcase className="w-4 h-4 text-slate-400" />
                     <span>Vínculo Patrimonial *</span>
                   </label>
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <button
                       type="button"
                       onClick={() => handleOwnershipChange('PROPRIO')}
@@ -624,7 +624,7 @@ export const OnboardStandalone: React.FC = () => {
                       {/* Monitor Vínculo Patrimonial */}
                       <div className="space-y-1.5">
                         <label className="text-xs font-bold text-slate-300">Vínculo do Monitor</label>
-                        <div className="grid grid-cols-2 gap-2">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                           <button
                             type="button"
                             onClick={() => setMonitorOwnershipType('PROPRIO')}
@@ -694,8 +694,8 @@ export const OnboardStandalone: React.FC = () => {
 
         {/* Modal de Cadastro Rápido de Nova Localidade */}
         {isNewLocationModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-fadeIn">
-            <div className="bg-slate-900 border border-purple-500/40 rounded-3xl p-6 max-w-md w-full shadow-2xl space-y-4">
+          <div className="responsive-modal-backdrop animate-fadeIn">
+            <div className="responsive-modal-panel border-purple-500/40 max-w-md space-y-4">
               <div className="flex items-center justify-between border-b border-slate-800 pb-3">
                 <div className="flex items-center gap-2">
                   <Building2 className="w-5 h-5 text-purple-400" />

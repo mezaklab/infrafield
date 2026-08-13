@@ -3,10 +3,12 @@ import { z } from 'zod';
 import { prisma } from '../lib/prisma';
 import { AssetStatus, PeripheralCategory, PeripheralSubcategory, Prisma, Role } from '@prisma/client';
 import { emitAssetStatusUpdate } from '../services/websocket.service';
+import { normalizeMacAddress } from '../modules/network/utils/macAddress';
+import { findMacOwner } from '../modules/network/services/findMacOwner';
 
 export const peripheralRouter = Router();
 
-const CreatePeripheralSchema = z.object({
+const PeripheralFieldsSchema = z.object({
   name: z.string().min(2, 'Nome é obrigatório'),
   code: z.string().min(2, 'Código é obrigatório'),
   assetTag: z.string().optional().nullable(),
@@ -18,7 +20,13 @@ const CreatePeripheralSchema = z.object({
   subcategory: z.nativeEnum(PeripheralSubcategory).optional().nullable(),
   brand: z.string().optional().nullable(),
   model: z.string().optional().nullable(),
-  ipAddress: z.string().optional().nullable(),
+  macAddress: z.string().trim().transform((value, ctx) => {
+    if (!value) return null;
+    const normalized = normalizeMacAddress(value);
+    if (!normalized) { ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'MAC Address inválido' }); return z.NEVER; }
+    return normalized;
+  }).optional().nullable(),
+  monitoringEnabled: z.boolean().optional().default(false),
   specifications: z.string().optional().nullable(),
   status: z.nativeEnum(AssetStatus).optional().default(AssetStatus.OPERATIONAL),
   locationId: z.string().optional().nullable(),
@@ -26,8 +34,13 @@ const CreatePeripheralSchema = z.object({
   assignedToId: z.string().optional().nullable(),
   imageUrl: z.string().optional().nullable(),
 });
+const CreatePeripheralSchema = PeripheralFieldsSchema.superRefine((data, ctx) => {
+  if (data.monitoringEnabled && !data.macAddress) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['macAddress'], message: 'Informe um MAC Address para ativar o monitoramento.' });
+});
 
-const UpdatePeripheralSchema = CreatePeripheralSchema.partial();
+const UpdatePeripheralSchema = PeripheralFieldsSchema.partial().superRefine((data, ctx) => {
+  if (data.monitoringEnabled === true && data.macAddress === null) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['macAddress'], message: 'Informe um MAC Address para ativar o monitoramento.' });
+});
 
 const canAccessCompany = (req: Request, companyId: string) =>
   req.user?.role === Role.SUPERADMIN || req.user?.companyId === companyId;
@@ -112,6 +125,8 @@ peripheralRouter.get('/', async (req: Request, res: Response) => {
         { brand: { contains: String(search), mode: 'insensitive' } },
         { model: { contains: String(search), mode: 'insensitive' } },
         { ipAddress: { contains: String(search), mode: 'insensitive' } },
+        { currentIp: { contains: String(search), mode: 'insensitive' } },
+        { macAddress: { contains: String(search), mode: 'insensitive' } },
         { specifications: { contains: String(search), mode: 'insensitive' } },
       ];
     }
@@ -179,6 +194,15 @@ peripheralRouter.post('/', async (req: Request, res: Response) => {
       companyId = company.id;
     }
 
+    if (parsed.data.locationId) {
+      const location = await prisma.location.findFirst({ where: { id: parsed.data.locationId, companyId }, select: { id: true } });
+      if (!location) return res.status(400).json({ error: 'A localização selecionada não existe mais. Selecione outra localização.', code: 'INVALID_LOCATION' });
+    }
+    if (parsed.data.macAddress) {
+      const owner = await findMacOwner(parsed.data.macAddress);
+      if (owner) return res.status(409).json({ error: `MAC Address já cadastrado em ${owner.name} (${owner.code}).` });
+    }
+
     const existing = await prisma.peripheral.findUnique({ where: { code: parsed.data.code } });
     if (existing) {
       return res.status(400).json({ error: 'Já existe um item com este código de identificação' });
@@ -197,7 +221,8 @@ peripheralRouter.post('/', async (req: Request, res: Response) => {
         subcategory,
         brand: parsed.data.brand,
         model: parsed.data.model,
-        ipAddress: parsed.data.ipAddress,
+        macAddress: parsed.data.macAddress,
+        monitoringEnabled: parsed.data.monitoringEnabled,
         specifications: parsed.data.specifications,
         status: parsed.data.status,
         locationId: parsed.data.locationId,
@@ -214,6 +239,7 @@ peripheralRouter.post('/', async (req: Request, res: Response) => {
     return res.status(201).json(newPeripheral);
   } catch (error: any) {
     console.error('Error creating peripheral:', error);
+    if (error?.code === 'P2002') return res.status(409).json({ error: 'MAC Address ou código já cadastrado em outro ativo.' });
     return res.status(500).json({ error: 'Erro ao cadastrar periférico' });
   }
 });
@@ -227,12 +253,24 @@ peripheralRouter.patch('/:id', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Dados inválidos', details: parsed.error.format() });
     }
 
-    const existing = await prisma.peripheral.findUnique({ where: { id }, select: { companyId: true } });
+    const existing = await prisma.peripheral.findUnique({ where: { id }, select: { companyId: true, macAddress: true, monitoringEnabled: true } });
     if (!existing) {
       return res.status(404).json({ error: 'Periférico / Ativo de informática não encontrado' });
     }
     if (!canAccessCompany(req, existing.companyId)) {
       return res.status(403).json({ error: 'Acesso negado' });
+    }
+
+    if (parsed.data.locationId) {
+      const location = await prisma.location.findFirst({ where: { id: parsed.data.locationId, companyId: existing.companyId }, select: { id: true } });
+      if (!location) return res.status(400).json({ error: 'A localização selecionada não existe mais. Selecione outra localização.', code: 'INVALID_LOCATION' });
+    }
+    const resultingMac = parsed.data.macAddress === undefined ? existing.macAddress : parsed.data.macAddress;
+    const resultingMonitoring = parsed.data.monitoringEnabled === undefined ? existing.monitoringEnabled : parsed.data.monitoringEnabled;
+    if (resultingMonitoring && !resultingMac) return res.status(400).json({ error: 'Informe um MAC Address para ativar o monitoramento.' });
+    if (parsed.data.macAddress) {
+      const owner = await findMacOwner(parsed.data.macAddress, { kind: 'PERIPHERAL', id });
+      if (owner) return res.status(409).json({ error: `MAC Address já cadastrado em ${owner.name} (${owner.code}).` });
     }
 
     const updateData: Prisma.PeripheralUpdateInput = { ...parsed.data };
@@ -252,13 +290,13 @@ peripheralRouter.patch('/:id', async (req: Request, res: Response) => {
       },
     });
 
-    if (parsed.data.status || parsed.data.ipAddress) {
+    if (parsed.data.status) {
       emitAssetStatusUpdate({
         id: updated.id,
         code: updated.code,
         name: updated.name,
         status: updated.status,
-        ipAddress: updated.ipAddress || undefined,
+        ipAddress: updated.currentIp || undefined,
         companyId: updated.companyId,
       });
     }
@@ -266,6 +304,7 @@ peripheralRouter.patch('/:id', async (req: Request, res: Response) => {
     return res.json(updated);
   } catch (error: any) {
     console.error('Error updating peripheral:', error);
+    if (error?.code === 'P2002') return res.status(409).json({ error: 'MAC Address já cadastrado em outro ativo.' });
     return res.status(500).json({ error: 'Erro ao atualizar periférico' });
   }
 });

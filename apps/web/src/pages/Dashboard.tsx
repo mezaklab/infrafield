@@ -36,6 +36,9 @@ import {
 import { getSocket, StatusUpdatedPayload } from '../services/socket';
 import { TelemetryWaveform } from '../components/TelemetryWaveform';
 import { ExportDropdown } from '../components/Layout/ExportDropdown';
+import { api, getAssets, getNotifications, getPeripherals } from '../services/api';
+import type { Asset, NotificationItem, Peripheral, Ticket } from '../types';
+import { OperationalDashboard, type OperationalDevice } from '../components/Dashboard/OperationalDashboard';
 
 interface DashboardProps {
   onNavigate: (tab: TabType) => void;
@@ -52,6 +55,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loadingStats, setLoadingStats] = useState<boolean>(true);
   const [locations, setLocations] = useState<Location[]>([]);
+  const [assets, setAssets] = useState<Asset[]>([]);
+  const [peripherals, setPeripherals] = useState<Peripheral[]>([]);
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+  const [tickets, setTickets] = useState<Ticket[]>([]);
   const [isLocationsModalOpen, setIsLocationsModalOpen] = useState<boolean>(false);
 
   // Location CRUD Modal States
@@ -145,12 +152,20 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
 
     // Fetch Dashboard Statistics from PostgreSQL
     try {
-      const [statsData, locsData] = await Promise.all([
+      const [statsData, locsData, assetsData, peripheralsData, notificationsData, ticketsResponse] = await Promise.all([
         getDashboardStats(),
         getLocations(),
+        getAssets().catch(() => []),
+        getPeripherals().catch(() => []),
+        getNotifications().catch(() => []),
+        api.get<Ticket[]>('/tickets').catch(() => ({ data: [] as Ticket[] })),
       ]);
       setStats(statsData);
       setLocations(locsData || []);
+      setAssets(assetsData);
+      setPeripherals(peripheralsData);
+      setNotifications(notificationsData);
+      setTickets(ticketsResponse.data || []);
     } catch (err) {
       console.warn('Failed to load DB stats/locations:', err);
     } finally {
@@ -196,19 +211,31 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
   }, [loadData]);
 
   // Asset category distribution percentages
-  const totalAssets = stats?.assets.total || 5;
+  const totalAssets = stats?.assets.total || 0;
   const categories = [
-    { label: 'Servidores & Virtualização', count: stats?.assets.categoriesCount?.['Servidores'] || 1, color: 'from-cyan-500 to-blue-500', icon: Server },
-    { label: 'Switches & Roteamento', count: stats?.assets.categoriesCount?.['Redes & Switches'] || 1, color: 'from-blue-500 to-indigo-500', icon: Network },
-    { label: 'Firewalls & Segurança', count: stats?.assets.categoriesCount?.['Segurança & Firewalls'] || 1, color: 'from-emerald-500 to-teal-500', icon: ShieldCheck },
-    { label: 'Storage & Armazenamento', count: stats?.assets.categoriesCount?.['Storage & Armazenamento'] || 1, color: 'from-purple-500 to-indigo-500', icon: HardDrive },
-    { label: 'Access Points & Wi-Fi', count: stats?.assets.categoriesCount?.['Redes Sem Fio'] || 1, color: 'from-amber-500 to-orange-500', icon: Wifi },
+    { label: 'Servidores & Virtualização', count: stats?.assets.categoriesCount?.['Servidores'] || 0, color: 'from-cyan-500 to-blue-500', icon: Server },
+    { label: 'Switches & Roteamento', count: stats?.assets.categoriesCount?.['Redes & Switches'] || 0, color: 'from-blue-500 to-indigo-500', icon: Network },
+    { label: 'Firewalls & Segurança', count: stats?.assets.categoriesCount?.['Segurança & Firewalls'] || 0, color: 'from-emerald-500 to-teal-500', icon: ShieldCheck },
+    { label: 'Storage & Armazenamento', count: stats?.assets.categoriesCount?.['Storage & Armazenamento'] || 0, color: 'from-purple-500 to-indigo-500', icon: HardDrive },
+    { label: 'Access Points & Wi-Fi', count: stats?.assets.categoriesCount?.['Redes Sem Fio'] || 0, color: 'from-amber-500 to-orange-500', icon: Wifi },
   ];
 
   return (
     <div className="space-y-6">
+      <OperationalDashboard
+        stats={stats}
+        devices={[
+          ...assets.map((asset): OperationalDevice => ({ ...asset, kind: 'asset' })),
+          ...peripherals.map((peripheral): OperationalDevice => ({ ...peripheral, kind: 'peripheral' })),
+        ]}
+        notifications={notifications}
+        tickets={tickets}
+        loading={loadingStats}
+        onNavigate={onNavigate}
+      />
+      <div className="hidden" aria-hidden="true">
       {/* NOC Control Header & API Telemetry Bar */}
-      <div className={`border rounded-3xl p-5 shadow-2xl relative overflow-hidden backdrop-blur-md transition-all ${
+      <div className={`border rounded-2xl sm:rounded-3xl p-4 sm:p-5 shadow-2xl relative overflow-hidden backdrop-blur-md transition-all ${
         health 
           ? 'bg-[#080d1a] border-cyan-500/20' 
           : 'bg-rose-950/20 border-rose-500/40 shadow-[0_0_30px_rgba(244,63,94,0.15)]'
@@ -256,7 +283,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
             </div>
           </div>
 
-          <div className="flex items-center gap-2 flex-wrap">
+          <div className="grid grid-cols-2 sm:flex items-center gap-2 w-full md:w-auto">
             {/* Sync button */}
             <button
               onClick={loadData}
@@ -313,14 +340,14 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
       </div>
 
       {/* 4 Executive KPI Cards Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         {/* CARD 1: Total de Ativos Mapeados */}
         <div
           onClick={() => onNavigate('assets')}
           role="button"
           tabIndex={0}
           onKeyDown={(e) => e.key === 'Enter' && onNavigate('assets')}
-          className="bg-[#080d1a] border border-cyan-500/15 rounded-2xl p-5 shadow-xl relative overflow-hidden group hover:border-cyan-500/50 hover:bg-[#0b1326] transition-all cursor-pointer select-none active:scale-[0.98]"
+          className="bg-[#080d1a] border border-cyan-500/15 rounded-2xl p-3 sm:p-5 shadow-xl relative overflow-hidden group hover:border-cyan-500/50 hover:bg-[#0b1326] transition-all cursor-pointer select-none active:scale-[0.98]"
           title="Clique para ir para a gestão de ativos"
         >
           <div className="flex items-center justify-between">
@@ -331,14 +358,14 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
           </div>
           <div className="mt-3 flex items-baseline justify-between">
             <span className="text-3xl font-black text-white tracking-tight group-hover:text-[#00f2fe] transition-colors">
-              {loadingStats ? '...' : stats?.assets.total ?? 5}
+              {loadingStats ? '...' : stats?.assets.total ?? 0}
             </span>
             <span className="text-xs font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-0.5 rounded-full flex items-center gap-1">
               <CheckCircle2 className="w-3 h-3" /> {stats?.assets.healthRate ?? 100}% Saúde
             </span>
           </div>
           <div className="mt-3 pt-2.5 border-t border-slate-800/80 flex items-center justify-between text-[11px] text-slate-400">
-            <span>Operacionais: <strong className="text-emerald-400 font-bold">{stats?.assets.operational ?? 5}</strong></span>
+            <span>Online <strong className="text-emerald-400">{stats?.assets.monitoring?.online ?? 0}</strong> · Degradados <strong className="text-amber-400">{stats?.assets.monitoring?.degraded ?? 0}</strong> · Desconhecidos <strong>{stats?.assets.monitoring?.unknown ?? 0}</strong> · Offline <strong className="text-rose-400">{stats?.assets.monitoring?.offline ?? 0}</strong></span>
             <span className="flex items-center gap-1 text-cyan-400 font-semibold group-hover:underline">
               Ver Todos <ChevronRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
             </span>
@@ -362,14 +389,14 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
           </div>
           <div className="mt-3 flex items-baseline justify-between">
             <span className="text-3xl font-black text-white tracking-tight group-hover:text-blue-400 transition-colors">
-              {loadingStats ? '...' : stats?.visits.total ?? 4}
+              {loadingStats ? '...' : stats?.visits.total ?? 0}
             </span>
             <span className="text-xs font-bold text-[#00f2fe] bg-[#00f2fe]/10 border border-[#00f2fe]/20 px-2.5 py-0.5 rounded-full flex items-center gap-1">
-              <TrendingUp className="w-3 h-3" /> {stats?.visits.conciliationRate ?? 98}% Conciliados
+              <TrendingUp className="w-3 h-3" /> {stats?.visits.conciliationRate ?? 0}% Conciliados
             </span>
           </div>
           <div className="mt-3 pt-2.5 border-t border-slate-800/80 flex items-center justify-between text-[11px] text-slate-400">
-            <span>Concluídas: <strong className="text-emerald-400 font-bold">{stats?.visits.completed ?? 2}</strong></span>
+            <span>Concluídas: <strong className="text-emerald-400 font-bold">{stats?.visits.completed ?? 0}</strong></span>
             <span className="flex items-center gap-1 text-blue-400 font-semibold group-hover:underline">
               Ver Ordens <ChevronRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
             </span>
@@ -393,14 +420,14 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
           </div>
           <div className="mt-3 flex items-baseline justify-between">
             <span className="text-3xl font-black text-white tracking-tight group-hover:text-rose-400 transition-colors">
-              {loadingStats ? '...' : stats?.issues?.total ?? 2}
+              {loadingStats ? '...' : stats?.issues?.total ?? 0}
             </span>
             <span className="text-xs font-bold text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2.5 py-0.5 rounded-full flex items-center gap-1">
               <AlertTriangle className="w-3 h-3" /> Requer Atenção
             </span>
           </div>
           <div className="mt-3 pt-2.5 border-t border-slate-800/80 flex items-center justify-between text-[11px] text-slate-400">
-            <span>Críticas/Altas: <strong className="text-rose-400 font-bold">{(stats?.issues?.critical ?? 0) + (stats?.issues?.high ?? 1)}</strong></span>
+            <span>Críticas/Altas: <strong className="text-rose-400 font-bold">{(stats?.issues?.critical ?? 0) + (stats?.issues?.high ?? 0)}</strong></span>
             <span className="flex items-center gap-1 text-rose-400 font-semibold group-hover:underline">
               Filtrar Alertas <ChevronRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
             </span>
@@ -512,7 +539,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
                       <div>
                         <h4 className="text-sm font-bold text-white group-hover:text-[#00f2fe] transition-colors">{activity.client}</h4>
                         <p className="text-xs text-slate-400">
-                          Protocolo: <span className="text-[#00f2fe] font-mono font-bold">{activity.protocol}</span> • Técnico: <span className="text-slate-300 font-medium">{activity.technician?.name || 'Carlos Silva'}</span>
+                          Protocolo: <span className="text-[#00f2fe] font-mono font-bold">{activity.protocol}</span> • Técnico: <span className="text-slate-300 font-medium">{activity.technician?.name || 'Não atribuído'}</span>
                         </p>
                       </div>
                     </div>
@@ -549,10 +576,11 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
         </div>
       </div>
 
+      </div>
       {/* Modal de Detalhamento de Cobertura e Locais Mapeados */}
       {isLocationsModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-fadeIn">
-          <div className="bg-[#080d1a] border border-cyan-500/30 rounded-3xl p-6 max-w-2xl w-full shadow-2xl space-y-5">
+        <div className="responsive-modal-backdrop animate-fadeIn">
+          <div className="responsive-modal-panel bg-[#080d1a] border-cyan-500/30 max-w-2xl space-y-5">
             <div className="flex items-center justify-between border-b border-slate-800 pb-4">
               <div className="flex items-center gap-3">
                 <div className="p-2.5 bg-emerald-500/10 text-emerald-400 rounded-2xl border border-emerald-500/20 shadow-[0_0_10px_rgba(16,185,129,0.15)]">
@@ -705,7 +733,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
             </div>
 
             <div className="pt-3 border-t border-slate-800 flex items-center justify-between text-xs text-slate-400">
-              <span>Total: <strong className="text-white font-bold">{locations.length || 4} Unidades Mapeadas</strong></span>
+              <span>Total: <strong className="text-white font-bold">{locations.length} Unidades Mapeadas</strong></span>
               <button
                 onClick={() => setIsLocationsModalOpen(false)}
                 className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-slate-200 font-semibold rounded-xl border border-slate-800 transition-all cursor-pointer"

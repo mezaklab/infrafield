@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { Server, Lock, User, ArrowRight, ShieldCheck, Eye, EyeOff, AlertCircle, Shield, Wrench } from 'lucide-react';
+import { Server, Lock, User, ArrowRight, ShieldCheck, Eye, EyeOff, AlertCircle } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { ThemeToggle } from '../components/Layout/ThemeToggle';
 
-export const Login: React.FC = () => {
+export const Login: React.FC<{ onForgotPassword?: () => void }> = ({ onForgotPassword }) => {
   const { login } = useAuth();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -28,32 +29,22 @@ export const Login: React.FC = () => {
     }
   };
 
-  const fillDemo = (role: 'admin' | 'tech') => {
-    if (role === 'admin') {
-      setUsername(import.meta.env.VITE_DEMO_ADMIN_USERNAME || '');
-      setPassword(import.meta.env.VITE_DEMO_ADMIN_PASSWORD || '');
-    } else {
-      setUsername(import.meta.env.VITE_DEMO_TECH_USERNAME || '');
-      setPassword(import.meta.env.VITE_DEMO_TECH_PASSWORD || '');
-    }
-    setError(null);
-  };
-
   return (
-    <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4 relative overflow-hidden">
+    <div className="min-h-dvh bg-slate-950 flex items-center justify-center px-3 py-[max(1rem,env(safe-area-inset-top))] sm:p-6 relative overflow-hidden">
+      <ThemeToggle className="absolute right-4 top-[max(1rem,env(safe-area-inset-top))] z-20" />
       {/* Ambient glow blobs */}
       <div className="absolute -top-40 -left-40 w-96 h-96 bg-cyan-600/15 rounded-full blur-3xl pointer-events-none" />
       <div className="absolute -bottom-40 -right-40 w-96 h-96 bg-blue-600/15 rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-indigo-900/10 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[min(600px,140vw)] aspect-square bg-indigo-900/10 rounded-full blur-3xl pointer-events-none" />
 
-      <div className="w-full max-w-md bg-slate-900/95 border border-slate-800 rounded-3xl p-8 shadow-2xl backdrop-blur-xl relative z-10">
+      <div className="surface-elevated w-full max-w-md bg-slate-900/95 border border-slate-800 rounded-2xl sm:rounded-3xl p-5 sm:p-8 shadow-2xl backdrop-blur-xl relative z-10">
         {/* Brand Header */}
-        <div className="flex flex-col items-center text-center mb-8">
+        <div className="flex flex-col items-center text-center mb-6 sm:mb-8">
           <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center shadow-xl shadow-cyan-500/30 text-white mb-4 relative">
             <Server className="w-8 h-8" />
             <span className="absolute -top-1 -right-1 w-4 h-4 bg-emerald-400 rounded-full border-2 border-slate-900 animate-pulse" />
           </div>
-          <h1 className="text-2xl font-extrabold text-white tracking-tight">InfraField NOC</h1>
+          <h1 className="text-[clamp(1.35rem,6vw,1.5rem)] font-extrabold text-white tracking-tight">InfraField NOC</h1>
           <p className="text-xs text-slate-400 mt-1">Operações &amp; Infraestrutura de TI</p>
         </div>
 
@@ -80,7 +71,7 @@ export const Login: React.FC = () => {
                 autoCapitalize="none"
                 autoCorrect="off"
                 className="w-full bg-slate-950 border border-slate-800 hover:border-slate-700 focus:border-cyan-500 rounded-xl pl-10 pr-4 py-2.5 text-sm text-slate-100 focus:outline-none transition-colors placeholder:text-slate-600 font-mono"
-                placeholder="Digite seu usuário, ex: mezak.filho"
+                placeholder="Digite seu usuário, ex: nome.sobrenome"
               />
             </div>
           </div>
@@ -128,31 +119,8 @@ export const Login: React.FC = () => {
               </>
             )}
           </button>
+          {onForgotPassword && <button type="button" onClick={onForgotPassword} className="action-text text-xs font-semibold">Esqueceu sua senha?</button>}
         </form>
-
-        {import.meta.env.DEV && (
-          <div className="mt-5 space-y-2">
-            <p className="text-center text-[11px] text-slate-500 uppercase tracking-wider font-bold">Acesso rápido (demonstração)</p>
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => fillDemo('admin')}
-                className="flex items-center justify-center gap-2 px-3 py-2 bg-slate-800/60 hover:bg-slate-800 border border-slate-700 hover:border-cyan-500/40 text-xs font-semibold text-slate-300 hover:text-cyan-400 rounded-xl transition-all cursor-pointer"
-              >
-                <Shield className="w-3.5 h-3.5 text-cyan-400" />
-                Admin / Gestor
-              </button>
-              <button
-                type="button"
-                onClick={() => fillDemo('tech')}
-                className="flex items-center justify-center gap-2 px-3 py-2 bg-slate-800/60 hover:bg-slate-800 border border-slate-700 hover:border-amber-500/40 text-xs font-semibold text-slate-300 hover:text-amber-400 rounded-xl transition-all cursor-pointer"
-              >
-                <Wrench className="w-3.5 h-3.5 text-amber-400" />
-                Técnico de Campo
-              </button>
-            </div>
-          </div>
-        )}
 
         {/* Footer badge */}
         <div className="mt-6 pt-4 border-t border-slate-800/60 flex items-center justify-center gap-2 text-[11px] text-slate-500">

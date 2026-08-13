@@ -171,12 +171,12 @@ export const AdminLocations: React.FC = () => {
   );
 
   return (
-    <div className="space-y-6">
+    <div className="admin-data-page space-y-5">
       {/* Page Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="admin-page-hero surface-ambient flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-2xl p-4 sm:p-5">
         <div>
-          <h2 className="text-2xl font-black text-white tracking-tight">Localidades</h2>
-          <p className="text-xs text-slate-400 mt-1">
+          <h2 className="if-text text-2xl font-black tracking-tight">Localidades</h2>
+          <p className="if-text-secondary text-xs mt-1 max-w-3xl">
             Gerencie matrizes, filiais, prédios e departamentos corporativos. Localidades cadastradas aqui aparecem em todo o sistema.
           </p>
         </div>
@@ -184,15 +184,16 @@ export const AdminLocations: React.FC = () => {
         <div className="flex items-center gap-2 shrink-0">
           <button
             onClick={loadLocations}
-            className="p-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl border border-slate-700 transition-all cursor-pointer"
+            className="admin-icon-button h-10 w-10 rounded-xl"
             title="Recarregar"
+            aria-label="Recarregar localidades"
           >
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
           </button>
 
           <button
             onClick={handleOpenCreate}
-            className="flex items-center gap-2 px-4 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold text-xs rounded-xl shadow-lg shadow-emerald-500/25 transition-all cursor-pointer"
+            className="admin-button-primary min-h-10 inline-flex items-center justify-center gap-2 px-4 py-2.5 font-extrabold text-xs rounded-xl"
           >
             <Plus className="w-4 h-4 stroke-[3]" />
             <span>Nova Localidade</span>
@@ -202,44 +203,44 @@ export const AdminLocations: React.FC = () => {
 
       {/* Stats Row */}
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-        <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-1">
+        <div className="admin-kpi-card p-4 rounded-2xl space-y-2">
           <div className="flex items-center gap-2 text-slate-400 text-xs font-semibold">
             <Building2 className="w-4 h-4 text-purple-400" />
             <span>Total de Localidades</span>
           </div>
-          <p className="text-2xl font-black text-white">{locations.length}</p>
+          <p className="metric-number if-text text-2xl font-black">{locations.length}</p>
         </div>
 
-        <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-1">
+        <div className="admin-kpi-card p-4 rounded-2xl space-y-2">
           <div className="flex items-center gap-2 text-slate-400 text-xs font-semibold">
             <Layers className="w-4 h-4 text-cyan-400" />
             <span>Prédios / Blocos</span>
           </div>
-          <p className="text-2xl font-black text-white">
+          <p className="metric-number if-text text-2xl font-black">
             {new Set(locations.map((l) => l.building).filter(Boolean)).size || locations.length}
           </p>
         </div>
 
-        <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-1">
+        <div className="admin-kpi-card col-span-2 sm:col-span-1 p-4 rounded-2xl space-y-2">
           <div className="flex items-center gap-2 text-slate-400 text-xs font-semibold">
             <MapPin className="w-4 h-4 text-emerald-400" />
             <span>Com Sala Definida</span>
           </div>
-          <p className="text-2xl font-black text-white">
+          <p className="metric-number if-text text-2xl font-black">
             {locations.filter((l) => l.room).length}
           </p>
         </div>
       </div>
 
       {/* Search */}
-      <div className="relative">
-        <Search className="w-4 h-4 absolute left-3.5 top-3.5 text-slate-500 pointer-events-none" />
+      <div className="admin-toolbar surface-elevated relative rounded-2xl p-3">
+        <Search className="w-4 h-4 absolute left-6 top-1/2 -translate-y-1/2 if-text-muted pointer-events-none" />
         <input
           type="text"
           placeholder="Buscar localidade, prédio ou sala..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          className="w-full pl-10 pr-4 py-3 bg-slate-900/80 border border-slate-800 rounded-xl text-white text-xs focus:outline-none focus:border-purple-500 transition-all"
+          className="admin-control min-h-11 w-full pl-10 pr-4 py-3 rounded-xl text-sm"
         />
       </div>
 
@@ -252,30 +253,31 @@ export const AdminLocations: React.FC = () => {
       )}
 
       {/* Locations Table */}
-      <div className="bg-slate-900/80 border border-slate-800 rounded-2xl overflow-hidden">
+      <div className="admin-data-panel rounded-2xl overflow-hidden">
         {loading ? (
           <div className="p-12 text-center text-slate-400 text-xs flex flex-col items-center gap-3">
             <RefreshCw className="w-6 h-6 animate-spin text-purple-400" />
             <span>Carregando localidades...</span>
           </div>
         ) : filteredTree.length === 0 ? (
-          <div className="p-12 text-center space-y-3">
+          <div className="admin-empty-state m-4 sm:m-6">
             <Building2 className="w-10 h-10 text-slate-700 mx-auto" />
             <p className="text-xs text-slate-400">
               {searchQuery ? 'Nenhuma localidade encontrada para essa busca.' : 'Nenhuma localidade cadastrada. Clique em "Nova Localidade" para começar.'}
             </p>
           </div>
-        ) : (
-          <table className="w-full text-xs">
+        ) : (<>
+          <div className="sm:hidden p-3 space-y-3">{filteredTree.map((item) => { const loc = item.location; const isSubsector = item.depth > 0; return <article key={loc.id} className="mobile-data-card admin-mobile-card space-y-3"><div className="flex items-start gap-3"><Building2 className="w-5 h-5 text-purple-400 shrink-0" /><div className="min-w-0"><h3 className="if-text font-bold break-words">{loc.name}</h3><p className="if-text-secondary text-xs break-words">{[loc.building, loc.floor, loc.room].filter(Boolean).join(' · ') || 'Sem detalhes de endereço'}</p>{isSubsector && <span className="action-text text-[10px]">Sublocalidade</span>}</div></div><div className="grid grid-cols-2 gap-2">{!isSubsector && <button onClick={() => handleOpenCreateSubsector(loc)} className="admin-button-secondary min-h-11 rounded-xl inline-flex items-center justify-center gap-2"><Plus className="w-4 h-4" />Subitem</button>}<button onClick={() => handleOpenEdit(loc)} className="admin-button-secondary min-h-11 rounded-xl inline-flex items-center justify-center gap-2"><Edit2 className="w-4 h-4" />Editar</button><button onClick={() => handleDelete(loc.id, loc.name)} className="admin-button-secondary min-h-11 rounded-xl inline-flex items-center justify-center gap-2 danger-text"><Trash2 className="w-4 h-4" />Excluir</button></div></article>})}</div>
+          <table className="hidden sm:table w-full text-xs">
             <thead>
-              <tr className="border-b border-slate-800 text-slate-400 text-[11px] uppercase tracking-wider">
+              <tr className="admin-table-head text-[11px] tracking-wide">
                 <th className="px-5 py-3 text-left font-semibold">Localidade / Departamento</th>
                 <th className="px-5 py-3 text-left font-semibold hidden sm:table-cell">Prédio / Bloco</th>
                 <th className="px-5 py-3 text-left font-semibold hidden md:table-cell">Andar / Sala</th>
                 <th className="px-5 py-3 text-right font-semibold">Ações</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="admin-table-body">
               {filteredTree.map((item, idx) => {
                 const loc = item.location;
                 const isSubsector = item.depth > 0;
@@ -284,9 +286,9 @@ export const AdminLocations: React.FC = () => {
                 return (
                   <tr
                     key={loc.id}
-                    className={`border-b border-slate-800/60 transition-colors ${
+                    className={`admin-table-row ${
                       idx === filteredTree.length - 1 ? 'border-b-0' : ''
-                    } ${isSubsector ? 'bg-purple-950/20 hover:bg-purple-900/30' : 'bg-slate-900/60 hover:bg-slate-800/40'}`}
+                    } ${isSubsector ? 'is-subrow' : ''}`}
                   >
                     <td
                       className="py-4 pr-5"
@@ -296,15 +298,15 @@ export const AdminLocations: React.FC = () => {
                         {isSubsector ? (
                           <CornerDownRight className="w-4 h-4 text-purple-400 shrink-0" />
                         ) : (
-                          <div className="w-8 h-8 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center shrink-0">
+                          <div className="admin-icon-box icon-box h-8 w-8 rounded-xl">
                             <Building2 className="w-4 h-4 text-purple-400" />
                           </div>
                         )}
                         <div>
-                          <p className="font-bold text-white flex items-center gap-2">
+                          <p className="if-text font-bold flex items-center gap-2 flex-wrap">
                             <span>{loc.name}</span>
                             {isSubsector && (
-                              <span className="text-[10px] font-bold text-purple-300 bg-purple-500/10 border border-purple-500/30 px-2 py-0.5 rounded-md">
+                              <span className="ui-badge admin-role-badge role-admin text-[10px] font-bold px-2 py-1 rounded-md">
                                 Sublocalidade
                               </span>
                             )}
@@ -342,8 +344,9 @@ export const AdminLocations: React.FC = () => {
                         {!isSubsector && (
                           <button
                             onClick={() => handleOpenCreateSubsector(loc)}
-                            className="p-2 bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 hover:text-purple-200 rounded-xl border border-purple-500/30 transition-all cursor-pointer flex items-center gap-1 font-bold text-xs"
+                            className="admin-icon-button is-accent h-9 w-9 rounded-xl"
                             title="Adicionar Sublocalidade Filha"
+                            aria-label={`Adicionar sublocalidade em ${loc.name}`}
                           >
                             <Plus className="w-3.5 h-3.5 stroke-[3]" />
                           </button>
@@ -351,16 +354,18 @@ export const AdminLocations: React.FC = () => {
 
                         <button
                           onClick={() => handleOpenEdit(loc)}
-                          className="p-2 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-xl border border-slate-700 transition-all cursor-pointer"
+                          className="admin-icon-button h-9 w-9 rounded-xl"
                           title="Editar"
+                          aria-label={`Editar ${loc.name}`}
                         >
                           <Edit2 className="w-3.5 h-3.5" />
                         </button>
 
                         <button
                           onClick={() => handleDelete(loc.id, loc.name)}
-                          className="p-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 rounded-xl border border-rose-500/20 transition-all cursor-pointer"
+                          className="admin-icon-button is-danger h-9 w-9 rounded-xl"
                           title="Excluir"
+                          aria-label={`Excluir ${loc.name}`}
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
@@ -370,7 +375,7 @@ export const AdminLocations: React.FC = () => {
                 );
               })}
             </tbody>
-          </table>
+          </table></>
         )}
       </div>
 
@@ -384,8 +389,8 @@ export const AdminLocations: React.FC = () => {
 
       {/* Create / Edit Modal */}
       {isFormOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
-          <div className="bg-slate-900 border border-purple-500/40 rounded-3xl p-6 max-w-lg w-full shadow-2xl space-y-5">
+        <div className="responsive-modal-backdrop">
+          <div className="responsive-modal-panel border-purple-500/40 max-w-lg space-y-5">
             {/* Header */}
             <div className="flex items-center justify-between border-b border-slate-800 pb-4">
               <div className="flex items-center gap-2">
@@ -476,7 +481,7 @@ export const AdminLocations: React.FC = () => {
               </div>
 
               {/* Andar & Sala */}
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <label className="text-slate-300 font-bold">Andar / Pavimento</label>
                   <input
@@ -527,8 +532,8 @@ export const AdminLocations: React.FC = () => {
 
       {/* Secondary Modal: Cadastrar Rápido Localidade Pai (para fluxo de criação de filho) */}
       {isQuickParentOpen && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-fadeIn">
-          <div className="bg-slate-900 border border-purple-500/40 rounded-3xl p-6 max-w-md w-full shadow-2xl space-y-4">
+        <div className="responsive-modal-backdrop z-[60] animate-fadeIn">
+          <div className="responsive-modal-panel border-purple-500/40 max-w-md space-y-4">
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
               <div className="flex items-center gap-2">
                 <div className="w-8 h-8 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center">

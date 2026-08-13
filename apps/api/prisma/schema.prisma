@@ -38,16 +38,36 @@ enum AssetStatus {
   CRITICAL
 }
 
+enum DeviceMonitoringStatus {
+  ONLINE
+  DEGRADED
+  UNKNOWN
+  OFFLINE
+}
+
 enum PeripheralCategory {
   COMPUTADOR
   IMPRESSORA
   SCANNER
   MONITOR
+  SOFTWARE
+  SWITCH
+  ROTEADOR
+  AP
+  NOBREAK
+  NAS
+  STORAGE
+  THIN_CLIENT
+  TELEFONE_IP
+  CAMERA_IP
+  IOT
+  OUTRO
 }
 
 enum PeripheralSubcategory {
   DESKTOP
   NOTEBOOK
+  SERVIDOR
 }
 
 enum VisitStatus {
@@ -147,14 +167,17 @@ model Location {
 }
 
 model User {
-  id        String  @id @default(uuid())
-  name      String
-  email     String  @unique
-  username  String? @unique
-  password  String
-  role      Role    @default(TECHNICIAN)
-  companyId String
-  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  id           String      @id @default(uuid())
+  name         String
+  email        String      @unique
+  username     String?     @unique
+  password     String
+  role         Role        @default(TECHNICIAN)
+  isActive     Boolean     @default(true) @map("is_active")
+  accessRoleId String?     @map("access_role_id")
+  accessRole   AccessRole? @relation(fields: [accessRoleId], references: [id], onDelete: SetNull)
+  companyId    String
+  company      Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
   locationId String?
   location   Location? @relation(fields: [locationId], references: [id], onDelete: SetNull)
@@ -169,24 +192,73 @@ model User {
   authoredTickets Ticket[]        @relation("TicketAuthor")
   assignedTickets Ticket[]        @relation("TicketTechnician")
   ticketMessages  TicketMessage[]
+  passwordResetTokens PasswordResetToken[]
 
   @@map("users")
 }
 
+model AccessRole {
+  id          String   @id @default(uuid())
+  key         String   @unique
+  name        String
+  description String?
+  enabled     Boolean  @default(true)
+  protected   Boolean  @default(false)
+  legacyRole  Role?    @unique @map("legacy_role")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  users       User[]
+  permissions RolePermission[]
+
+  @@map("access_roles")
+}
+
+model Permission {
+  id          String   @id @default(uuid())
+  key         String   @unique
+  name        String
+  description String?
+  category    String
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  roles RolePermission[]
+
+  @@map("permissions")
+}
+
+model RolePermission {
+  roleId       String     @map("role_id")
+  permissionId String     @map("permission_id")
+  role         AccessRole @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@map("role_permissions")
+}
+
 model Asset {
-  id            String      @id @default(uuid())
-  name          String
-  code          String      @unique
-  assetTag      String? // Patrimônio
-  ownershipType String?     @default("PROPRIO") // Tipo de Patrimônio: 'PROPRIO' | 'LOCADO'
-  rentalCompany String?     @map("rental_company") // Empresa Locadora
-  serialNumber  String?
-  hostname      String?
-  ipAddress     String?
-  category      String
-  status        AssetStatus @default(OPERATIONAL)
-  imageUrl      String?
-  wifiBands     String? // Frequência e Banda Wi-Fi (Ex: '2.4GHz / 5GHz')
+  id                  String                 @id @default(uuid())
+  name                String
+  code                String                 @unique
+  assetTag            String? // Patrimônio
+  ownershipType       String?                @default("PROPRIO") // Tipo de Patrimônio: 'PROPRIO' | 'LOCADO'
+  rentalCompany       String?                @map("rental_company") // Empresa Locadora
+  serialNumber        String?
+  hostname            String?
+  ipAddress           String?
+  macAddress          String?                @unique @map("mac_address")
+  currentIp           String?                @map("current_ip")
+  monitoringStatus    DeviceMonitoringStatus @default(UNKNOWN) @map("monitoring_status")
+  lastSeenAt          DateTime?              @map("last_seen_at")
+  lastCheckedAt       DateTime?              @map("last_checked_at")
+  latencyMs           Float?                 @map("latency_ms")
+  consecutiveFailures Int                    @default(0) @map("consecutive_failures")
+  monitoringEnabled   Boolean                @default(false) @map("monitoring_enabled")
+  category            String
+  status              AssetStatus            @default(OPERATIONAL)
+  imageUrl            String?
+  wifiBands           String? // Frequência e Banda Wi-Fi (Ex: '2.4GHz / 5GHz')
 
   locationId String?
   location   Location? @relation(fields: [locationId], references: [id], onDelete: SetNull)
@@ -201,11 +273,25 @@ model Asset {
   checklistResponses ChecklistResponse[]
   issues             Issue[]
   tickets            Ticket[]
+  ipHistory          DeviceIpHistory[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@map("assets")
+}
+
+model DeviceIpHistory {
+  id         String    @id @default(uuid())
+  deviceId   String    @map("device_id")
+  device     Asset     @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  ipAddress  String    @map("ip_address")
+  detectedAt DateTime  @default(now()) @map("detected_at")
+  lostAt     DateTime? @map("lost_at")
+
+  @@index([deviceId, detectedAt])
+  @@index([deviceId, lostAt])
+  @@map("device_ip_history")
 }
 
 model Visit {
@@ -351,21 +437,29 @@ model Notification {
 }
 
 model Peripheral {
-  id             String                 @id @default(uuid())
-  name           String
-  code           String                 @unique
-  assetTag       String? // Patrimônio
-  ownershipType  String?                @default("PROPRIO") // Tipo de Patrimônio: 'PROPRIO' | 'LOCADO'
-  rentalCompany  String?                @map("rental_company") // Empresa Locadora
-  serialNumber   String?
-  category       PeripheralCategory     @default(COMPUTADOR)
-  subcategory    PeripheralSubcategory? // DESKTOP ou NOTEBOOK (quando category == COMPUTADOR)
-  brand          String?
-  model          String?
-  ipAddress      String? // Endereço IP para monitoramento via Poller (ICMP Ping)
-  specifications String? // Especificações técnicas / Observações
-  status         AssetStatus            @default(OPERATIONAL)
-  imageUrl       String?
+  id                  String                 @id @default(uuid())
+  name                String
+  code                String                 @unique
+  assetTag            String? // Patrimônio
+  ownershipType       String?                @default("PROPRIO") // Tipo de Patrimônio: 'PROPRIO' | 'LOCADO'
+  rentalCompany       String?                @map("rental_company") // Empresa Locadora
+  serialNumber        String?
+  category            PeripheralCategory     @default(COMPUTADOR)
+  subcategory         PeripheralSubcategory? // DESKTOP ou NOTEBOOK (quando category == COMPUTADOR)
+  brand               String?
+  model               String?
+  ipAddress           String? // Compatibilidade temporária; currentIp é o endereço dinâmico atual
+  macAddress          String?                @unique @map("mac_address")
+  currentIp           String?                @map("current_ip")
+  monitoringStatus    DeviceMonitoringStatus @default(UNKNOWN) @map("monitoring_status")
+  lastSeenAt          DateTime?              @map("last_seen_at")
+  lastCheckedAt       DateTime?              @map("last_checked_at")
+  latencyMs           Float?                 @map("latency_ms")
+  consecutiveFailures Int                    @default(0) @map("consecutive_failures")
+  monitoringEnabled   Boolean                @default(false) @map("monitoring_enabled")
+  specifications      String? // Especificações técnicas / Observações
+  status              AssetStatus            @default(OPERATIONAL)
+  imageUrl            String?
 
   locationId String?
   location   Location? @relation(fields: [locationId], references: [id], onDelete: SetNull)
@@ -376,10 +470,24 @@ model Peripheral {
   assignedToId String?
   assignedTo   User?   @relation(fields: [assignedToId], references: [id], onDelete: SetNull)
 
+  ipHistory PeripheralIpHistory[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@map("peripherals")
+}
+
+model PeripheralIpHistory {
+  id           String     @id @default(uuid())
+  peripheralId String     @map("peripheral_id")
+  peripheral   Peripheral @relation(fields: [peripheralId], references: [id], onDelete: Cascade)
+  ipAddress    String     @map("ip_address")
+  detectedAt   DateTime   @default(now()) @map("detected_at")
+  lostAt       DateTime?  @map("lost_at")
+
+  @@index([peripheralId, detectedAt])
+  @@map("peripheral_ip_history")
 }
 
 model AuditLog {
@@ -392,6 +500,19 @@ model AuditLog {
   createdAt DateTime @default(now())
 
   @@map("audit_logs")
+}
+
+model PasswordResetToken {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String   @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+
+  @@index([userId, expiresAt])
+  @@map("password_reset_tokens")
 }
 
 model SystemSetting {
@@ -409,6 +530,9 @@ model Ticket {
   code        String         @unique
   subject     String
   description String
+  category    String         @default("Outros")
+  categoryId  String?
+  categoryRef Category?      @relation(fields: [categoryId], references: [id], onDelete: Restrict)
   status      TicketStatus   @default(ABERTO)
   priority    TicketPriority @default(MEDIA)
 
@@ -417,6 +541,9 @@ model Ticket {
 
   locationId String?
   location   Location? @relation(fields: [locationId], references: [id], onDelete: SetNull)
+
+  sectorId String? @map("sector_id")
+  sector   Sector? @relation(fields: [sectorId], references: [id], onDelete: Restrict)
 
   assetId String?
   asset   Asset?  @relation(fields: [assetId], references: [id], onDelete: SetNull)
@@ -432,6 +559,9 @@ model Ticket {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  @@index([sectorId], map: "tickets_sector_id_idx")
+  @@index([locationId], map: "tickets_location_id_idx")
+  @@index([categoryId], map: "tickets_category_id_idx")
   @@map("tickets")
 }
 
@@ -468,6 +598,8 @@ model Sector {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  tickets Ticket[]
+
   @@map("sectors")
 }
 
@@ -476,6 +608,8 @@ model Category {
   name      String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  tickets Ticket[]
 
   @@map("categories")
 }

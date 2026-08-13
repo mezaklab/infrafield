@@ -1,6 +1,8 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../lib/prisma';
 import { z } from 'zod';
+import { Role } from '@prisma/client';
+import { requireRole } from '../middlewares/auth.middleware';
 
 export const sectorRouter = Router();
 
@@ -40,7 +42,7 @@ sectorRouter.get('/:id', async (req: Request, res: Response) => {
 });
 
 // POST /api/sectors - Cria novo setor
-sectorRouter.post('/', async (req: Request, res: Response) => {
+sectorRouter.post('/', requireRole([Role.SUPERADMIN, Role.ADMIN]), async (req: Request, res: Response) => {
   try {
     const { name } = CreateSectorSchema.parse(req.body);
     const sector = await prisma.sector.create({
@@ -56,7 +58,7 @@ sectorRouter.post('/', async (req: Request, res: Response) => {
 });
 
 // PUT /api/sectors/:id - Atualiza setor existente
-sectorRouter.put('/:id', async (req: Request, res: Response) => {
+sectorRouter.put('/:id', requireRole([Role.SUPERADMIN, Role.ADMIN]), async (req: Request, res: Response) => {
   try {
     const { name } = UpdateSectorSchema.parse(req.body);
     const sector = await prisma.sector.update({
@@ -73,8 +75,15 @@ sectorRouter.put('/:id', async (req: Request, res: Response) => {
 });
 
 // DELETE /api/sectors/:id - Remove setor
-sectorRouter.delete('/:id', async (req: Request, res: Response) => {
+sectorRouter.delete('/:id', requireRole([Role.SUPERADMIN, Role.ADMIN]), async (req: Request, res: Response) => {
   try {
+    const ticketCount = await (prisma.ticket as any).count({ where: { sectorId: req.params.id } });
+    if (ticketCount > 0) {
+      return res.status(409).json({
+        success: false,
+        message: `Este setor está associado a ${ticketCount} chamado(s) e não pode ser excluído.`,
+      });
+    }
     await prisma.sector.delete({
       where: { id: req.params.id },
     });

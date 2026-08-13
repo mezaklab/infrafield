@@ -28,3 +28,34 @@ export function getAllowedOrigins(): string[] {
 
   return Array.from(new Set(configured));
 }
+
+interface CorsOriginOptions {
+  nodeEnv?: string;
+  allowedOrigins?: readonly string[];
+}
+
+/**
+ * Valida uma origem completa. Quick Tunnels são aceitos dinamicamente somente
+ * em desenvolvimento e apenas por HTTPS com hostname filho exato do domínio.
+ * Em produção, um tunnel ainda pode ser autorizado explicitamente via
+ * CORS_ORIGINS/WEB_APP_URL, como qualquer outra origem.
+ */
+export function isCorsOriginAllowed(origin: string | undefined, options: CorsOriginOptions = {}): boolean {
+  if (!origin) return true; // clientes sem Origin (CLI, health check, comunicação server-to-server)
+
+  const normalizedOrigin = origin.trim().replace(/\/+$/, '');
+  const allowedOrigins = options.allowedOrigins || getAllowedOrigins();
+  if (allowedOrigins.includes(normalizedOrigin)) return true;
+
+  if ((options.nodeEnv ?? process.env.NODE_ENV) === 'production') return false;
+
+  try {
+    const parsed = new URL(normalizedOrigin);
+    return parsed.origin === normalizedOrigin
+      && parsed.protocol === 'https:'
+      && parsed.hostname.endsWith('.trycloudflare.com')
+      && parsed.hostname !== 'trycloudflare.com';
+  } catch {
+    return false;
+  }
+}

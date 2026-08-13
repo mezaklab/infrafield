@@ -37,47 +37,19 @@ interface TicketDashboardProps {
 export const TicketDashboard: React.FC<TicketDashboardProps> = ({ onNavigateToTickets }) => {
   const [data, setData] = useState<HelpdeskDashboardData | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
+  const [loadError, setLoadError] = useState<boolean>(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState<boolean>(false);
 
   const fetchDashboardData = useCallback(async () => {
     try {
       setLoading(true);
+      setLoadError(false);
       const res = await api.get<HelpdeskDashboardData>('/tickets/dashboard');
       setData(res.data);
     } catch (err) {
-      console.warn('Fallback ticket dashboard data:', err);
-      // Fallback fallback data if API offline
-      setData({
-        kpis: {
-          totalActive: 5,
-          overdueSla: 1,
-          resolvedMonth: 14,
-          avgResolutionTime: '1h 45min',
-        },
-        charts: {
-          evolution: [
-            { month: 'Mar/26', abertos: 8, solucionados: 7 },
-            { month: 'Abr/26', abertos: 12, solucionados: 10 },
-            { month: 'Mai/26', abertos: 15, solucionados: 14 },
-            { month: 'Jun/26', abertos: 10, solucionados: 11 },
-            { month: 'Jul/26', abertos: 18, solucionados: 16 },
-            { month: 'Ago/26', abertos: 9, solucionados: 8 },
-          ],
-          sectorDistribution: [
-            { name: 'Datacenter Central', value: 7, color: '#00f2fe' },
-            { name: 'Secretaria de Saúde', value: 5, color: '#3b82f6' },
-            { name: 'Almoxarifado', value: 4, color: '#10b981' },
-            { name: 'Escritório Central', value: 3, color: '#f59e0b' },
-          ],
-          topIncidents: [
-            { equipment: 'Impressoras & Scanners', count: 8 },
-            { equipment: 'Desktops & Notebooks', count: 6 },
-            { equipment: 'Rede, Wi-Fi & Switches', count: 4 },
-            { equipment: 'Sistemas & Senhas', count: 3 },
-            { equipment: 'Servidores & Racks', count: 1 },
-          ],
-        },
-      });
+      console.warn('Failed to load ticket dashboard data:', err);
+      setData(null);
+      setLoadError(true);
     } finally {
       setLoading(false);
     }
@@ -116,9 +88,11 @@ export const TicketDashboard: React.FC<TicketDashboardProps> = ({ onNavigateToTi
   const evolutionData = data?.charts?.evolution || [];
   const sectorData = data?.charts?.sectorDistribution || [];
   const topIncidentsData = data?.charts?.topIncidents || [];
+  const ticketsWithSector = sectorData.reduce((total, sector) => total + sector.value, 0);
 
   return (
     <div className="space-y-6">
+      {loadError && <div className="p-3 rounded-xl border border-rose-500/30 bg-rose-500/10 danger-text text-sm">Não foi possível carregar os dados reais do Helpdesk.</div>}
       {/* Header Banner */}
       <div className="bg-[#080d1a] border border-cyan-500/20 rounded-3xl p-6 shadow-2xl relative overflow-hidden backdrop-blur-md">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -333,7 +307,9 @@ export const TicketDashboard: React.FC<TicketDashboardProps> = ({ onNavigateToTi
             </h3>
             <p className="text-xs text-slate-400">Proporção de chamados por setor/unidade</p>
 
-            <div className="h-56 w-full relative my-2">
+            {sectorData.length === 0 ? (
+              <div className="h-56 grid place-items-center text-center text-sm text-slate-400">Nenhum chamado com setor associado.</div>
+            ) : <div className="h-56 w-full relative my-2">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
@@ -363,14 +339,14 @@ export const TicketDashboard: React.FC<TicketDashboardProps> = ({ onNavigateToTi
 
               {/* Central Text inside Donut */}
               <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                <span className="text-2xl font-black text-white">{kpis.totalActive}</span>
-                <span className="text-[10px] text-slate-400 uppercase font-bold">Na Fila</span>
+                <span className="text-2xl font-black text-white">{ticketsWithSector}</span>
+                <span className="text-[10px] text-slate-400 uppercase font-bold">Chamados</span>
               </div>
-            </div>
+            </div>}
           </div>
 
           {/* Custom Sector Legends */}
-          <div className="space-y-1.5 pt-2 border-t border-slate-800/80 text-xs">
+          {sectorData.length > 0 && <div className="space-y-1.5 pt-2 border-t border-slate-800/80 text-xs">
             {sectorData.slice(0, 4).map((sec, idx) => (
               <div key={idx} className="flex items-center justify-between text-slate-300">
                 <span className="flex items-center gap-2 truncate">
@@ -380,7 +356,7 @@ export const TicketDashboard: React.FC<TicketDashboardProps> = ({ onNavigateToTi
                 <span className="font-mono font-bold text-white shrink-0">{sec.value}</span>
               </div>
             ))}
-          </div>
+          </div>}
         </div>
 
         {/* CHART 3: Top 5 Incidentes por Categoria / Ativos (Horizontal Bar Chart) */}
@@ -389,16 +365,16 @@ export const TicketDashboard: React.FC<TicketDashboardProps> = ({ onNavigateToTi
             <div>
               <h3 className="font-extrabold text-base text-white flex items-center gap-2">
                 <Layers className="w-5 h-5 text-purple-400" />
-                <span>Top 5 Incidentes por Categoria / Equipamentos</span>
+                <span>Chamados por Categoria</span>
               </h3>
-              <p className="text-xs text-slate-400">Categorias de equipamentos com maior volume de chamados</p>
+              <p className="text-xs text-slate-400">Categorias selecionadas nos chamados registrados</p>
             </div>
             <span className="text-xs font-mono font-bold text-purple-300 bg-purple-500/10 border border-purple-500/20 px-3 py-1 rounded-xl">
               Ranking de Incidentes
             </span>
           </div>
 
-          <div className="h-64 w-full pt-2">
+          {topIncidentsData.length === 0 ? <div className="h-32 grid place-items-center text-sm text-slate-400">Nenhum chamado disponível para classificar.</div> : <div className="h-64 w-full pt-2">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart
                 layout="vertical"
@@ -426,7 +402,7 @@ export const TicketDashboard: React.FC<TicketDashboardProps> = ({ onNavigateToTi
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
-          </div>
+          </div>}
         </div>
       </div>
 

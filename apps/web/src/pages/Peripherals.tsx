@@ -27,7 +27,7 @@ import {
   Zap,
   SlidersHorizontal,
 } from 'lucide-react';
-import { Location, Peripheral, PeripheralCategory, PeripheralSubcategory } from '../types';
+import { LensImportDraft, Location, Peripheral, PeripheralCategory, PeripheralSubcategory } from '../types';
 import { useAuth } from '../contexts/AuthContext';
 import {
   getPeripherals,
@@ -63,7 +63,7 @@ const SUB_MODULES: SubModuleConfig[] = [
     color: 'text-slate-300',
     accent: '#00f2fe',
     description: 'Inventário completo de todos os ativos de TI',
-    categories: ['COMPUTADOR', 'IMPRESSORA', 'SCANNER', 'MONITOR', 'SOFTWARE', 'SWITCH', 'ROTEADOR', 'AP', 'NOBREAK', 'OUTRO'],
+    categories: ['COMPUTADOR', 'IMPRESSORA', 'SCANNER', 'MONITOR', 'SOFTWARE', 'SWITCH', 'ROTEADOR', 'AP', 'NOBREAK', 'NAS', 'STORAGE', 'THIN_CLIENT', 'TELEFONE_IP', 'CAMERA_IP', 'IOT', 'OUTRO'],
   },
   {
     id: 'COMPUTADOR',
@@ -99,7 +99,7 @@ const SUB_MODULES: SubModuleConfig[] = [
     color: 'text-emerald-400',
     accent: '#10b981',
     description: 'Switches, Roteadores, APs e Nobreaks',
-    categories: ['SWITCH', 'ROTEADOR', 'AP', 'NOBREAK'],
+    categories: ['SWITCH', 'ROTEADOR', 'AP', 'NOBREAK', 'NAS', 'STORAGE', 'THIN_CLIENT', 'TELEFONE_IP', 'CAMERA_IP', 'IOT'],
   },
   {
     id: 'PERIFERICO',
@@ -128,6 +128,12 @@ const getCategoryConfig = (cat: PeripheralCategory, sub?: PeripheralSubcategory)
     case 'ROTEADOR':   return { label: 'Roteador', icon: Wifi, color: 'text-teal-400 bg-teal-500/10 border-teal-500/30' };
     case 'AP':         return { label: 'Access Point', icon: Wifi, color: 'text-sky-400 bg-sky-500/10 border-sky-500/30' };
     case 'NOBREAK':    return { label: 'Nobreak', icon: Zap, color: 'text-yellow-400 bg-yellow-500/10 border-yellow-500/30' };
+    case 'NAS':         return { label: 'NAS', icon: HardDrive, color: 'text-indigo-400 bg-indigo-500/10 border-indigo-500/30' };
+    case 'STORAGE':     return { label: 'Storage', icon: HardDrive, color: 'text-indigo-400 bg-indigo-500/10 border-indigo-500/30' };
+    case 'THIN_CLIENT': return { label: 'Thin Client', icon: Cpu, color: 'text-cyan-400 bg-cyan-500/10 border-cyan-500/30' };
+    case 'TELEFONE_IP': return { label: 'Telefone IP', icon: Network, color: 'text-teal-400 bg-teal-500/10 border-teal-500/30' };
+    case 'CAMERA_IP':   return { label: 'Câmera IP', icon: Scan, color: 'text-sky-400 bg-sky-500/10 border-sky-500/30' };
+    case 'IOT':         return { label: 'IoT corporativo', icon: Wifi, color: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30' };
     default:           return { label: cat, icon: Package, color: 'text-slate-400 bg-slate-500/10 border-slate-500/30' };
   }
 };
@@ -161,14 +167,22 @@ const getStatusBadge = (status: string) => {
   }
 };
 
+const getMonitoringBadge = (item: Peripheral) => {
+  if (!item.monitoringEnabled) return <span className="text-[11px] font-semibold text-slate-500">Não monitorado</span>;
+  const colors = { ONLINE: 'text-emerald-400', DEGRADED: 'text-amber-400', UNKNOWN: 'text-slate-400', OFFLINE: 'text-rose-400' };
+  return <span className={`ui-badge text-[11px] font-bold ${colors[item.monitoringStatus]}`}><span className="h-1.5 w-1.5 rounded-full bg-current" aria-hidden="true" />{item.monitoringStatus}</span>;
+};
+
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 interface PeripheralsProps {
   defaultSubTab?: PeripheralsSubTab;
   onSubTabChange?: (sub: PeripheralsSubTab) => void;
+  lensImport?: LensImportDraft | null;
+  onLensImportConsumed?: () => void;
 }
 
-export const Peripherals: React.FC<PeripheralsProps> = ({ defaultSubTab = 'TODOS', onSubTabChange }) => {
+export const Peripherals: React.FC<PeripheralsProps> = ({ defaultSubTab = 'TODOS', onSubTabChange, lensImport, onLensImportConsumed }) => {
   const { isAdmin } = useAuth();
 
   const [activeSubTab, setActiveSubTabState] = useState<PeripheralsSubTab>(defaultSubTab);
@@ -204,11 +218,37 @@ export const Peripherals: React.FC<PeripheralsProps> = ({ defaultSubTab = 'TODOS
     subcategory: 'DESKTOP' as PeripheralSubcategory | '',
     brand: '',
     model: '',
-    ipAddress: '',
+    macAddress: '',
+    monitoringEnabled: false,
     specifications: '',
     status: 'OPERATIONAL' as 'OPERATIONAL' | 'MAINTENANCE' | 'CRITICAL' | 'INACTIVE',
     locationId: '',
   });
+
+  useEffect(() => {
+    if (!lensImport) return;
+    const type = lensImport.type.toUpperCase();
+    const category: PeripheralCategory = type === 'MONITOR' ? 'MONITOR' : type === 'IMPRESSORA' || type === 'MULTIFUNCIONAL' ? 'IMPRESSORA' : type === 'SCANNER' ? 'SCANNER' : 'COMPUTADOR';
+    const subcategory: PeripheralSubcategory | '' = category === 'COMPUTADOR' ? (type === 'NOTEBOOK' ? 'NOTEBOOK' : 'DESKTOP') : '';
+    setEditingItem(null);
+    setFormData((current) => ({
+      ...current,
+      name: [lensImport.manufacturer, lensImport.model].filter(Boolean).join(' ') || 'Ativo identificado',
+      code: `LENS-${Date.now().toString().slice(-6)}`,
+      assetTag: lensImport.assetTag,
+      serialNumber: lensImport.serviceTag || lensImport.serialNumber,
+      category,
+      subcategory,
+      brand: lensImport.manufacturer,
+      model: lensImport.model,
+      macAddress: lensImport.macAddress,
+      monitoringEnabled: Boolean(lensImport.macAddress),
+      specifications: lensImport.productNumber ? `Product Number: ${lensImport.productNumber}` : '',
+      locationId: locations[0]?.id || '',
+    }));
+    setIsModalOpen(true);
+    onLensImportConsumed?.();
+  }, [lensImport, locations, onLensImportConsumed]);
 
   const setActiveSubTab = (sub: PeripheralsSubTab) => {
     setActiveSubTabState(sub);
@@ -320,7 +360,7 @@ export const Peripherals: React.FC<PeripheralsProps> = ({ defaultSubTab = 'TODOS
       COMPUTADOR: allPeripherals.filter((p) => p.category === 'COMPUTADOR').length,
       MONITOR: allPeripherals.filter((p) => p.category === 'MONITOR').length,
       SOFTWARE: allPeripherals.filter((p) => p.category === 'SOFTWARE').length,
-      REDE: allPeripherals.filter((p) => ['SWITCH', 'ROTEADOR', 'AP', 'NOBREAK'].includes(p.category)).length,
+      REDE: allPeripherals.filter((p) => ['SWITCH', 'ROTEADOR', 'AP', 'NOBREAK', 'NAS', 'STORAGE', 'THIN_CLIENT', 'TELEFONE_IP', 'CAMERA_IP', 'IOT'].includes(p.category)).length,
       PERIFERICO: allPeripherals.filter((p) => ['IMPRESSORA', 'SCANNER', 'OUTRO'].includes(p.category)).length,
     };
     return counts;
@@ -348,7 +388,8 @@ export const Peripherals: React.FC<PeripheralsProps> = ({ defaultSubTab = 'TODOS
       subcategory: defaultCat === 'COMPUTADOR' ? 'DESKTOP' : '',
       brand: '',
       model: '',
-      ipAddress: '',
+      macAddress: '',
+      monitoringEnabled: false,
       specifications: '',
       status: 'OPERATIONAL',
       locationId: locations[0]?.id || '',
@@ -369,7 +410,8 @@ export const Peripherals: React.FC<PeripheralsProps> = ({ defaultSubTab = 'TODOS
       subcategory: item.category === 'COMPUTADOR' ? (item.subcategory || 'DESKTOP') : '',
       brand: item.brand || '',
       model: item.model || '',
-      ipAddress: item.ipAddress && item.ipAddress !== 'N/A' ? item.ipAddress : '',
+      macAddress: item.macAddress || '',
+      monitoringEnabled: item.monitoringEnabled,
       specifications: item.specifications && item.specifications !== 'N/A' ? item.specifications : '',
       status: item.status,
       locationId: item.locationId || '',
@@ -381,6 +423,10 @@ export const Peripherals: React.FC<PeripheralsProps> = ({ defaultSubTab = 'TODOS
     e.preventDefault();
     if (!formData.name || !formData.code) {
       alert('Nome e Código são obrigatórios.');
+      return;
+    }
+    if (formData.monitoringEnabled && !formData.macAddress.trim()) {
+      alert('Informe um MAC Address para ativar o monitoramento automático.');
       return;
     }
     setIsSaving(true);
@@ -581,7 +627,7 @@ export const Peripherals: React.FC<PeripheralsProps> = ({ defaultSubTab = 'TODOS
       </div>
 
       {/* ── Search & Filters ──────────────────────────────────────── */}
-      <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-3 space-y-2.5">
+      <div className="surface-elevated bg-slate-900/60 border border-slate-800 rounded-2xl p-3 space-y-2.5">
         {/* Search Bar */}
         <div className="flex flex-col sm:flex-row gap-2.5">
           <div className="relative flex-1">
@@ -763,7 +809,8 @@ export const Peripherals: React.FC<PeripheralsProps> = ({ defaultSubTab = 'TODOS
             </div>
           </div>
 
-          <div className="overflow-x-auto" ref={tableRef as any}>
+          <div className="md:hidden p-3 space-y-3">{filteredPeripherals.map((item) => { const cfg = getCategoryConfig(item.category, item.subcategory); const Icon = cfg.icon; return <article key={item.id} className="mobile-data-card space-y-3"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><span className="font-mono text-xs font-bold text-cyan-300">{item.code}</span><h3 className="font-bold text-white break-words">{item.name}</h3><p className="text-xs text-slate-400">{item.brand} {item.model}</p></div>{getMonitoringBadge(item)}</div><div className="flex items-center gap-2 text-xs"><Icon className={`w-4 h-4 ${cfg.color}`} /><span className="text-slate-300">{cfg.label}</span></div>{item.monitoringEnabled ? <dl className="grid grid-cols-2 gap-3 text-xs"><div><dt className="text-slate-500">IP atual</dt><dd className="font-mono text-cyan-300 break-all">{item.currentIp || 'Aguardando descoberta'}</dd></div><div><dt className="text-slate-500">MAC</dt><dd className="font-mono text-slate-200 break-all">{item.macAddress}</dd></div><div><dt className="text-slate-500">Latência</dt><dd>{item.latencyMs ?? 'N/A'} ms</dd></div><div><dt className="text-slate-500">Falhas</dt><dd>{item.consecutiveFailures}</dd></div></dl> : <p className="text-xs text-slate-500">Monitoramento não disponível para este ativo.</p>}<button onClick={() => handleOpenEditModal(item)} className="min-h-11 w-full rounded-xl bg-slate-800 text-slate-200 flex items-center justify-center gap-2"><Edit2 className="w-4 h-4" />Editar ativo</button></article>})}</div>
+          <div className="hidden md:block overflow-x-auto" ref={tableRef as any}>
             <table className="w-full text-left text-xs border-collapse">
               <thead>
                 <tr className="bg-[#050811] text-slate-400 border-b border-slate-800 font-bold uppercase tracking-wider text-[11px]">
@@ -824,16 +871,16 @@ export const Peripherals: React.FC<PeripheralsProps> = ({ defaultSubTab = 'TODOS
 
                       {/* IP */}
                       <td className="py-4 px-4">
-                        {item.ipAddress && item.ipAddress !== 'N/A' ? (
+                        {item.monitoringEnabled ? (
                           <div className="space-y-1">
                             <span className="font-mono font-bold text-slate-200 bg-[#050811] border border-slate-800 px-2.5 py-1 rounded-lg inline-flex items-center gap-1.5">
                               <Wifi className="w-3.5 h-3.5 text-[#00f2fe] animate-pulse" />
-                              {item.ipAddress}
+                              {item.currentIp || 'Aguardando descoberta'}
                             </span>
-                            <span className="text-[10px] text-emerald-400 block font-semibold">● ICMP Ping</span>
+                            {getMonitoringBadge(item)}
                           </div>
                         ) : (
-                          <span className="text-[11px] text-slate-600 italic">—</span>
+                          <span className="text-[11px] text-slate-600 italic">Não monitorado</span>
                         )}
                       </td>
 
@@ -897,8 +944,8 @@ export const Peripherals: React.FC<PeripheralsProps> = ({ defaultSubTab = 'TODOS
 
       {/* ── Create / Edit Modal ───────────────────────────────────── */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
-          <div className="bg-[#080d1a] border border-cyan-500/30 rounded-3xl p-6 max-w-xl w-full shadow-2xl space-y-5 max-h-[90vh] overflow-y-auto custom-scrollbar">
+        <div className="responsive-modal-backdrop">
+          <div className="responsive-modal-panel bg-[#080d1a] border-cyan-500/30 max-w-xl space-y-5 custom-scrollbar">
             <div className="flex items-center justify-between border-b border-slate-800 pb-4">
               <div className="flex items-center gap-3">
                 <div className="p-2.5 bg-[#00f2fe]/10 text-[#00f2fe] rounded-2xl border border-[#00f2fe]/20">
@@ -958,6 +1005,12 @@ export const Peripherals: React.FC<PeripheralsProps> = ({ defaultSubTab = 'TODOS
                       <option value="ROTEADOR">Roteador</option>
                       <option value="AP">Access Point (AP)</option>
                       <option value="NOBREAK">Nobreak / UPS</option>
+                      <option value="NAS">NAS</option>
+                      <option value="STORAGE">Storage</option>
+                      <option value="THIN_CLIENT">Thin Client</option>
+                      <option value="TELEFONE_IP">Telefone IP</option>
+                      <option value="CAMERA_IP">Câmera IP</option>
+                      <option value="IOT">IoT corporativo</option>
                     </optgroup>
                     <optgroup label="🖨️ Periféricos">
                       <option value="IMPRESSORA">Impressora</option>
@@ -1049,22 +1102,22 @@ export const Peripherals: React.FC<PeripheralsProps> = ({ defaultSubTab = 'TODOS
                   />
                 </div>
 
-                {/* IP */}
+                {/* Rede / monitoramento MAC-first */}
                 <div className="space-y-1 sm:col-span-2 bg-[#050811] border border-slate-800 p-3 rounded-2xl">
                   <div className="flex items-center gap-2">
                     <Wifi className="w-4 h-4 text-[#00f2fe]" />
-                    <label className="text-slate-200 font-bold">Endereço IP (Monitoramento ICMP Poller)</label>
+                    <label className="text-slate-200 font-bold">MAC Address</label>
                   </div>
                   <input
                     type="text"
-                    placeholder="Ex: 192.168.1.150 ou 10.0.0.45"
-                    value={formData.ipAddress}
-                    onChange={(e) => setFormData({ ...formData, ipAddress: e.target.value })}
+                    placeholder="AA:BB:CC:DD:EE:FF"
+                    value={formData.macAddress}
+                    onChange={(e) => setFormData({ ...formData, macAddress: e.target.value })}
                     className="w-full bg-[#080d1a] border border-slate-800 focus:border-cyan-500 text-white font-mono rounded-xl px-3 py-2 outline-none mt-1"
                   />
-                  <p className="text-[10px] text-slate-400 mt-1">
-                    💡 Equipamentos com IP serão testados via ICMP Ping. Se responderem, o status é atualizado automaticamente para <strong className="text-emerald-400">OPERACIONAL</strong>.
-                  </p>
+                  <label className="flex items-center gap-2 min-h-11 text-sm text-slate-200 cursor-pointer"><input type="checkbox" checked={formData.monitoringEnabled} onChange={(e) => setFormData({ ...formData, monitoringEnabled: e.target.checked })} /> Monitoramento automático</label>
+                  <div className="rounded-xl bg-slate-900/70 px-3 py-2 text-xs"><span className="text-slate-500">IP atual</span><strong className="block text-cyan-300 font-mono">{editingItem?.currentIp || 'Será descoberto automaticamente'}</strong></div>
+                  <p className="text-[10px] text-slate-400 mt-1">O InfraField localizará o equipamento pelo MAC, descobrirá o IP atual e verificará sua disponibilidade.</p>
                 </div>
 
                 {/* Marca */}

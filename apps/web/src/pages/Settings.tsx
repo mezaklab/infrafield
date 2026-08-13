@@ -306,14 +306,14 @@ export const Settings: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto p-4 md:p-6">
+    <div className="settings-page space-y-5 max-w-7xl mx-auto p-3 sm:p-4 md:p-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-900/80 border border-slate-800 rounded-2xl p-6 shadow-xl">
+      <div className="settings-hero surface-ambient flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-2xl p-4 sm:p-5 md:p-6">
         <div>
-          <h1 className="text-xl md:text-2xl font-black text-white tracking-tight flex items-center gap-2">
+          <h1 className="if-text text-xl md:text-2xl font-black tracking-tight">
             Painel de Configurações Operacionais
           </h1>
-          <p className="text-xs md:text-sm text-slate-400">
+          <p className="if-text-secondary mt-1 text-xs md:text-sm">
             Gerenciamento de integrações com WhatsApp, cadastro de setores e categorias de chamados
           </p>
         </div>
@@ -326,7 +326,7 @@ export const Settings: React.FC = () => {
             fetchSectors();
             fetchCategories();
           }}
-          className="flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs border border-slate-700 transition-all"
+          className="if-button-secondary min-h-10 inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl font-bold text-xs"
         >
           <RefreshCw className="w-4 h-4" />
           <span>Atualizar Dados</span>
@@ -334,31 +334,31 @@ export const Settings: React.FC = () => {
       </div>
 
       {feedback && (
-        <div className={`p-4 rounded-2xl border text-xs md:text-sm font-semibold flex items-center justify-between gap-3 ${
+        <div className={`settings-feedback p-4 rounded-2xl border text-xs md:text-sm font-semibold flex items-center justify-between gap-3 ${
           feedback.type === 'success'
-            ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
-            : 'bg-rose-500/10 border-rose-500/30 text-rose-300'
+            ? 'bg-emerald-500/10 border-emerald-500/30 success-text'
+            : 'bg-rose-500/10 border-rose-500/30 danger-text'
         }`}>
           <div className="flex items-center gap-2">
             {feedback.type === 'success' ? <CheckCircle2 className="w-5 h-5 shrink-0" /> : <AlertCircle className="w-5 h-5 shrink-0" />}
             <span>{feedback.message}</span>
           </div>
-          <button onClick={() => setFeedback(null)} className="text-slate-400 hover:text-white">
+          <button onClick={() => setFeedback(null)} className="icon-box h-8 w-8 rounded-lg if-text-muted hover:text-[var(--if-text)] hover:bg-black/5" aria-label="Fechar mensagem">
             <X className="w-4 h-4" />
           </button>
         </div>
       )}
 
       {/* Seção 1: Conexão WhatsApp */}
-      <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-6">
-        <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+      <section className="settings-panel surface-elevated rounded-2xl p-4 sm:p-5 md:p-6 space-y-5">
+        <div className="flex items-center justify-between border-b if-divider pb-4 gap-3">
           <div className="flex items-center gap-3">
-            <div className="p-3 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
+            <div className="icon-box h-11 w-11 rounded-xl bg-[var(--if-accent-soft)] text-[var(--if-accent)] border border-cyan-500/20">
               <MessageSquare className="w-6 h-6" />
             </div>
             <div>
-              <h2 className="text-base md:text-lg font-bold text-white">Integrador WhatsApp (Evolution API)</h2>
-              <p className="text-xs text-slate-400">Status da instância e roteamento de alertas para grupos</p>
+              <h2 className="if-text text-base md:text-lg font-bold">Integrador WhatsApp (Evolution API)</h2>
+              <p className="if-text-secondary text-xs">Status da instância e roteamento de alertas para grupos</p>
             </div>
           </div>
 
@@ -366,20 +366,21 @@ export const Settings: React.FC = () => {
             <button
               onClick={fetchWhatsappStatus}
               disabled={loadingStatus}
-              className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition-all"
+              className="if-button-secondary icon-box h-10 w-10 rounded-xl"
               title="Atualizar Status"
+              aria-label="Atualizar status do WhatsApp"
             >
               <RefreshCw className={`w-4 h-4 ${loadingStatus ? 'animate-spin' : ''}`} />
             </button>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-5 items-stretch">
           {/* Card Status */}
-          <div className={`p-5 rounded-2xl border flex flex-col justify-between space-y-4 ${
+          <div className={`settings-status-card p-5 rounded-2xl border flex flex-col justify-between gap-4 ${
             isConnected
-              ? 'bg-emerald-950/20 border-emerald-500/40 text-emerald-300'
-              : 'bg-rose-950/20 border-rose-500/40 text-rose-300'
+              ? 'is-connected border-emerald-500/30 success-text'
+              : 'is-disconnected border-rose-500/30 danger-text'
           }`}>
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Status Atual</span>
@@ -387,10 +388,10 @@ export const Settings: React.FC = () => {
             </div>
 
             <div>
-              <div className="text-2xl font-black tracking-tight">
+              <div className="metric-number text-2xl font-black tracking-tight">
                 {isConnected ? 'CONECTADO' : 'DESCONECTADO'}
               </div>
-              <div className="text-xs text-slate-400 mt-1 font-mono">
+              <div className="if-text-secondary text-xs mt-1.5 font-mono leading-relaxed">
                 Estado da instância: {settings.whatsapp_status || 'DESCONHECIDO'}
               </div>
             </div>
@@ -398,7 +399,7 @@ export const Settings: React.FC = () => {
             <button
               onClick={handleGenerateQrCode}
               disabled={loadingQr || resettingInstance}
-              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-lg shadow-emerald-600/30 transition-all disabled:opacity-50"
+              className="if-button-primary min-h-10 w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs disabled:opacity-50"
             >
               {loadingQr ? <RefreshCw className="w-4 h-4 animate-spin" /> : <QrCode className="w-4 h-4" />}
               <span>{loadingQr ? 'Gerando...' : 'Gerar QR Code'}</span>
@@ -407,7 +408,7 @@ export const Settings: React.FC = () => {
             <button
               onClick={handleResetInstance}
               disabled={resettingInstance || loadingQr}
-              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs shadow-lg shadow-amber-600/30 transition-all disabled:opacity-50"
+              className="if-button-danger min-h-10 w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs disabled:opacity-50"
               title="Deleta e recria a instância para destravar estado 'connecting'"
             >
               {resettingInstance ? <RefreshCw className="w-4 h-4 animate-spin" /> : <RotateCcw className="w-4 h-4" />}
@@ -416,16 +417,16 @@ export const Settings: React.FC = () => {
           </div>
 
           {/* Seleção do Grupo de Destino */}
-          <div className="md:col-span-2 bg-slate-950/60 border border-slate-800 rounded-2xl p-5 space-y-4 flex flex-col justify-between">
+          <div className="settings-subpanel md:col-span-2 rounded-2xl p-4 sm:p-5 space-y-4 flex flex-col justify-between">
             <div>
               <div className="flex items-center justify-between mb-2">
-                <label className="text-xs font-bold uppercase tracking-wider text-slate-300">
+                <label htmlFor="whatsapp-alert-group" className="if-text-secondary text-xs font-bold tracking-wide">
                   Grupo de Destino dos Alertas
                 </label>
                 <button
                   onClick={fetchWhatsappGroups}
                   disabled={loadingGroups}
-                  className="text-xs text-cyan-400 hover:underline flex items-center gap-1"
+                  className="action-text inline-flex items-center gap-1.5 text-xs font-semibold hover:underline"
                 >
                   <RefreshCw className={`w-3 h-3 ${loadingGroups ? 'animate-spin' : ''}`} />
                   <span>Atualizar grupos</span>
@@ -433,9 +434,10 @@ export const Settings: React.FC = () => {
               </div>
 
               <select
+                id="whatsapp-alert-group"
                 value={settings.whatsapp_group_id || ''}
                 onChange={(e) => setSettings({ ...settings, whatsapp_group_id: e.target.value })}
-                className="w-full px-4 py-3 rounded-xl bg-slate-900 border border-slate-700 text-white text-sm focus:outline-none focus:border-cyan-500 transition-all font-medium"
+                className="settings-control w-full min-h-11 px-4 py-3 rounded-xl text-sm font-medium"
               >
                 <option value="">-- Selecione o Grupo de Notificação --</option>
                 {groups.map((group) => (
@@ -445,16 +447,16 @@ export const Settings: React.FC = () => {
                 ))}
               </select>
 
-              <p className="text-xs text-slate-400 mt-2">
+              <p className="if-text-secondary text-xs mt-2 leading-relaxed">
                 Os alertas de novos chamados abertos no sistema serão enviados automaticamente para o grupo selecionado acima.
               </p>
             </div>
 
-            <div className="flex items-center justify-end gap-3 pt-2">
+            <div className="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-end gap-2.5 pt-2">
               <button
                 onClick={handleTestSend}
                 disabled={testingSend}
-                className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs shadow-lg shadow-purple-600/30 transition-all disabled:opacity-50"
+                className="if-button-secondary min-h-10 inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl font-bold text-xs disabled:opacity-50"
               >
                 {testingSend ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                 <span>Testar Envio</span>
@@ -463,7 +465,7 @@ export const Settings: React.FC = () => {
               <button
                 onClick={handleSaveSettings}
                 disabled={savingSettings}
-                className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs shadow-lg shadow-cyan-600/30 transition-all"
+                className="if-button-primary min-h-10 inline-flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl font-bold text-xs disabled:opacity-50"
               >
                 {savingSettings ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                 <span>Salvar Seleção de Grupo</span>
@@ -471,30 +473,30 @@ export const Settings: React.FC = () => {
             </div>
           </div>
         </div>
-      </div>
+      </section>
 
       {/* Seção 2: Setores e Categorias */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-5 items-start">
         {/* Gestão de Setores */}
-        <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
-          <div className="flex items-center gap-3 pb-3 border-b border-slate-800 text-cyan-400">
+        <section className="settings-panel rounded-2xl p-4 sm:p-5 space-y-4">
+          <div className="flex items-center gap-3 pb-3 border-b if-divider text-[var(--if-accent)]">
             <Building2 className="w-5 h-5" />
-            <h2 className="text-base font-bold text-white">Gestão de Setores</h2>
+            <h2 className="if-text text-base font-bold">Gestão de Setores</h2>
           </div>
 
           {/* Adicionar Setor */}
-          <form onSubmit={handleAddSector} className="flex gap-2">
+          <form onSubmit={handleAddSector} className="flex flex-col sm:flex-row gap-2">
             <input
               type="text"
               placeholder="Nome do novo setor..."
               value={newSectorName}
               onChange={(e) => setNewSectorName(e.target.value)}
-              className="flex-1 px-4 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white text-xs focus:outline-none focus:border-cyan-500"
+              className="settings-control min-h-10 flex-1 px-4 py-2 rounded-xl text-sm"
             />
             <button
               type="submit"
               disabled={addingSector || !newSectorName.trim()}
-              className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs shadow-md transition-all disabled:opacity-50"
+              className="if-button-primary min-h-10 inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl font-bold text-xs disabled:opacity-50"
             >
               {addingSector ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
               <span>Adicionar</span>
@@ -504,23 +506,24 @@ export const Settings: React.FC = () => {
           {/* Lista de Setores */}
           <div className="space-y-2 max-h-72 overflow-y-auto custom-scrollbar pt-2">
             {loadingSectors ? (
-              <div className="text-center py-6 text-slate-500 text-xs flex items-center justify-center gap-2">
+              <div className="settings-empty flex items-center justify-center gap-2">
                 <RefreshCw className="w-4 h-4 animate-spin" />
                 <span>Carregando setores...</span>
               </div>
             ) : sectors.length === 0 ? (
-              <div className="text-center py-6 text-slate-500 text-xs">Nenhum setor cadastrado.</div>
+              <div className="settings-empty"><Building2 className="h-4 w-4" aria-hidden="true" /><span>Nenhum setor cadastrado.</span></div>
             ) : (
               sectors.map((sec) => (
                 <div
                   key={sec.id}
-                  className="flex items-center justify-between px-4 py-2.5 rounded-xl bg-slate-950/60 border border-slate-800 hover:border-slate-700 transition-all text-xs"
+                  className="settings-list-item flex items-center justify-between gap-3 px-3.5 py-2.5 rounded-xl text-xs"
                 >
-                  <span className="font-semibold text-slate-200">{sec.name}</span>
+                  <span className="if-text font-semibold truncate">{sec.name}</span>
                   <button
                     onClick={() => handleDeleteSector(sec.id)}
-                    className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
+                    className="settings-remove icon-box h-8 w-8 rounded-lg"
                     title="Excluir setor"
+                    aria-label={`Excluir setor ${sec.name}`}
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>
@@ -528,28 +531,28 @@ export const Settings: React.FC = () => {
               ))
             )}
           </div>
-        </div>
+        </section>
 
         {/* Gestão de Categorias */}
-        <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
-          <div className="flex items-center gap-3 pb-3 border-b border-slate-800 text-purple-400">
+        <section className="settings-panel rounded-2xl p-4 sm:p-5 space-y-4">
+          <div className="flex items-center gap-3 pb-3 border-b if-divider text-[var(--if-accent)]">
             <FolderKanban className="w-5 h-5" />
-            <h2 className="text-base font-bold text-white">Categorias de Atendimento</h2>
+            <h2 className="if-text text-base font-bold">Categorias de Atendimento</h2>
           </div>
 
           {/* Adicionar Categoria */}
-          <form onSubmit={handleAddCategory} className="flex gap-2">
+          <form onSubmit={handleAddCategory} className="flex flex-col sm:flex-row gap-2">
             <input
               type="text"
               placeholder="Nome da nova categoria..."
               value={newCategoryName}
               onChange={(e) => setNewCategoryName(e.target.value)}
-              className="flex-1 px-4 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white text-xs focus:outline-none focus:border-purple-500"
+              className="settings-control min-h-10 flex-1 px-4 py-2 rounded-xl text-sm"
             />
             <button
               type="submit"
               disabled={addingCategory || !newCategoryName.trim()}
-              className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs shadow-md transition-all disabled:opacity-50"
+              className="if-button-primary min-h-10 inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl font-bold text-xs disabled:opacity-50"
             >
               {addingCategory ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
               <span>Adicionar</span>
@@ -559,23 +562,24 @@ export const Settings: React.FC = () => {
           {/* Lista de Categorias */}
           <div className="space-y-2 max-h-72 overflow-y-auto custom-scrollbar pt-2">
             {loadingCategories ? (
-              <div className="text-center py-6 text-slate-500 text-xs flex items-center justify-center gap-2">
+              <div className="settings-empty flex items-center justify-center gap-2">
                 <RefreshCw className="w-4 h-4 animate-spin" />
                 <span>Carregando categorias...</span>
               </div>
             ) : categories.length === 0 ? (
-              <div className="text-center py-6 text-slate-500 text-xs">Nenhuma categoria cadastrada.</div>
+              <div className="settings-empty"><FolderKanban className="h-4 w-4" aria-hidden="true" /><span>Nenhuma categoria cadastrada.</span></div>
             ) : (
               categories.map((cat) => (
                 <div
                   key={cat.id}
-                  className="flex items-center justify-between px-4 py-2.5 rounded-xl bg-slate-950/60 border border-slate-800 hover:border-slate-700 transition-all text-xs"
+                  className="settings-list-item flex items-center justify-between gap-3 px-3.5 py-2.5 rounded-xl text-xs"
                 >
-                  <span className="font-semibold text-slate-200">{cat.name}</span>
+                  <span className="if-text font-semibold truncate">{cat.name}</span>
                   <button
                     onClick={() => handleDeleteCategory(cat.id)}
-                    className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
+                    className="settings-remove icon-box h-8 w-8 rounded-lg"
                     title="Excluir categoria"
+                    aria-label={`Excluir categoria ${cat.name}`}
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>
@@ -583,13 +587,13 @@ export const Settings: React.FC = () => {
               ))
             )}
           </div>
-        </div>
+        </section>
       </div>
 
       {/* Modal QR Code */}
       {isQrModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 max-w-sm w-full shadow-2xl space-y-5 text-center relative">
+        <div className="responsive-modal-backdrop">
+          <div className="responsive-modal-panel max-w-sm space-y-5 text-center relative">
             <button
               onClick={() => setIsQrModalOpen(false)}
               className="absolute top-4 right-4 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
@@ -608,7 +612,7 @@ export const Settings: React.FC = () => {
                   key={qrCodeUrl.slice(-10)}
                   src={qrCodeUrl}
                   alt="QR Code WhatsApp"
-                  className="w-64 h-64 object-contain block m-auto"
+                  className="w-full max-w-64 aspect-square object-contain block m-auto"
                   onError={(e) => {
                     console.error("Erro de renderização da imagem:", e);
                   }}

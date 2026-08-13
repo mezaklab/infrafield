@@ -15,6 +15,7 @@ export async function pollNetworkAssets(): Promise<void> {
     // 1. Buscar ativos de rede principais com IP ou Hostname
     const assets = await prisma.asset.findMany({
       where: {
+        monitoringEnabled: false,
         OR: [
           { ipAddress: { not: null } },
           { hostname: { not: null } }
@@ -32,7 +33,7 @@ export async function pollNetworkAssets(): Promise<void> {
     const totalMonitored = assets.length + peripherals.length;
 
     if (totalMonitored === 0) {
-      console.log('[NetworkPoller] ℹ️ Nenhum ativo ou periférico com IP/Hostname encontrado para monitoramento.');
+      console.log('[NetworkPoller:Legacy] ℹ️ Nenhum ativo legado (sem monitoramento por MAC) ou periférico com IP/Hostname encontrado.');
       return;
     }
 

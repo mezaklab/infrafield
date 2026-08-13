@@ -1,6 +1,20 @@
 export type TabType = 'dashboard' | 'assets' | 'visits' | 'issues' | 'peripherals' | 'tickets' | 'ticket-dashboard' | 'settings';
 export type PeripheralsSubTab = 'TODOS' | 'COMPUTADOR' | 'MONITOR' | 'SOFTWARE' | 'REDE' | 'PERIFERICO';
-export type AdminTabType = 'dashboard' | 'users' | 'audit-logs' | 'settings' | 'locations';
+export type AdminTabType = 'dashboard' | 'users' | 'roles' | 'audit-logs' | 'settings' | 'locations';
+
+export interface AccessRole {
+  id: string;
+  key: string;
+  name: string;
+  description?: string;
+  enabled: boolean;
+  protected: boolean;
+  legacyRole?: SystemUser['role'];
+  permissionKeys: string[];
+  _count?: { users: number };
+}
+
+export interface PermissionDefinition { id: string; key: string; name: string; description?: string; category: string }
 
 export interface SystemUser {
   id: string;
@@ -8,6 +22,9 @@ export interface SystemUser {
   email: string;
   username?: string;
   role: 'SUPERADMIN' | 'ADMIN' | 'MANAGER' | 'TECHNICIAN' | 'VIEWER' | 'USUARIO';
+  isActive?: boolean;
+  accessRoleId?: string;
+  accessRole?: { id: string; key: string; name: string };
   companyId: string;
   company?: { id: string; name: string };
   locationId?: string;
@@ -78,7 +95,7 @@ export interface Location {
   children?: { id: string; name: string }[];
 }
 
-export type PeripheralCategory = 'COMPUTADOR' | 'IMPRESSORA' | 'SCANNER' | 'MONITOR' | 'SOFTWARE' | 'SWITCH' | 'ROTEADOR' | 'AP' | 'NOBREAK' | 'OUTRO';
+export type PeripheralCategory = 'COMPUTADOR' | 'IMPRESSORA' | 'SCANNER' | 'MONITOR' | 'SOFTWARE' | 'SWITCH' | 'ROTEADOR' | 'AP' | 'NOBREAK' | 'NAS' | 'STORAGE' | 'THIN_CLIENT' | 'TELEFONE_IP' | 'CAMERA_IP' | 'IOT' | 'OUTRO';
 export type PeripheralSubcategory = 'DESKTOP' | 'NOTEBOOK' | 'SERVIDOR';
 
 export interface Peripheral {
@@ -95,6 +112,14 @@ export interface Peripheral {
   brand?: string;
   model?: string;
   ipAddress?: string;
+  currentIp?: string;
+  macAddress?: string;
+  monitoringEnabled: boolean;
+  monitoringStatus: 'ONLINE' | 'DEGRADED' | 'UNKNOWN' | 'OFFLINE';
+  latencyMs?: number;
+  consecutiveFailures: number;
+  lastSeenAt?: string;
+  lastCheckedAt?: string;
   specifications?: string;
   status: 'OPERATIONAL' | 'MAINTENANCE' | 'CRITICAL' | 'INACTIVE';
   imageUrl?: string;
@@ -140,6 +165,15 @@ export interface Asset {
   serialNumber?: string;
   hostname?: string;
   ipAddress?: string;
+  currentIp?: string;
+  macAddress?: string;
+  monitoringStatus: 'ONLINE' | 'DEGRADED' | 'UNKNOWN' | 'OFFLINE';
+  monitoringEnabled: boolean;
+  lastSeenAt?: string;
+  lastCheckedAt?: string;
+  latencyMs?: number;
+  consecutiveFailures: number;
+  ipHistory?: Array<{ id: string; ipAddress: string; detectedAt: string; lostAt?: string }>;
   category: string;
   locationId?: string;
   locationName?: string;
@@ -148,6 +182,18 @@ export interface Asset {
   wifiBands?: string;
   lastInspection?: string;
   assignedTo?: string;
+}
+
+export interface LensImportDraft {
+  type: string;
+  manufacturer: string;
+  model: string;
+  serialNumber: string;
+  serviceTag: string;
+  productNumber: string;
+  macAddress: string;
+  assetTag: string;
+  imageFile?: File;
 }
 
 export type VisitAssetStatus = 'ESPERADO' | 'ENCONTRADO' | 'AUSENTE' | 'NOVO';
@@ -238,6 +284,7 @@ export interface Issue {
   protocol?: string;
   title: string;
   description: string;
+  category?: string;
   severity: IssueSeverity;
   status: IssueStatus;
   recommendation?: string;
@@ -285,11 +332,19 @@ export interface Ticket {
   code: string;
   subject: string;
   description: string;
+  category?: string;
+  categoryId?: string | null;
+  categoryRef?: { id: string; name: string } | null;
   status: TicketStatus;
   priority: TicketPriority;
   companyId: string;
   locationId?: string | null;
   location?: Location | null;
+  sectorId?: string | null;
+  sector?: {
+    id: string;
+    name: string;
+  } | null;
   assetId?: string | null;
   asset?: {
     id: string;
@@ -330,7 +385,7 @@ export interface HelpdeskDashboardData {
   charts: {
     evolution: { month: string; abertos: number; solucionados: number }[];
     sectorDistribution: { name: string; value: number; color: string }[];
+    locationDistribution: { name: string; value: number; color: string }[];
     topIncidents: { equipment: string; count: number }[];
   };
 }
-

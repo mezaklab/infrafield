@@ -75,7 +75,7 @@ reportRouter.get('/visits/:visitId/pdf', async (req: Request, res: Response) => 
     doc.font('Helvetica').text(`${visit.location?.name || 'Rack Central'} (${visit.location?.building || 'Prédio A'})`, 150, startY + 25);
 
     doc.font('Helvetica-Bold').text(`Técnico Responsável:`, 50, startY + 40);
-    doc.font('Helvetica').text(visit.technician?.name || 'Carlos Silva (Técnico NOC)', 150, startY + 40);
+    doc.font('Helvetica').text(visit.technician?.name || 'Não atribuído', 150, startY + 40);
 
     doc.font('Helvetica-Bold').text(`Data / Horário:`, 50, startY + 55);
     doc.font('Helvetica').text(`${new Date(visit.scheduledDate).toLocaleDateString('pt-BR')} - Status: ${visit.status}`, 150, startY + 55);

@@ -4,8 +4,16 @@ import { prisma } from '../lib/prisma';
 import { AssetStatus, PeripheralCategory, PeripheralSubcategory, Prisma, Role } from '@prisma/client';
 import { processAndSaveEquipmentImage } from '../services/imageProcessor.service';
 import { emitAssetStatusUpdate } from '../services/websocket.service';
+import { normalizeMacAddress } from '../modules/network/utils/macAddress';
+import { isIP } from 'node:net';
+import { findMacOwner } from '../modules/network/services/findMacOwner';
 
 export const assetRouter = Router();
+
+const OptionalRelationIdSchema = z.preprocess(
+  (value) => value === null || (typeof value === 'string' && value.trim() === '') ? null : value,
+  z.string().trim().min(1).nullable().optional(),
+);
 
 const CreateAssetSchema = z.object({
   name: z.string().min(3, 'Nome é obrigatório'),
@@ -16,10 +24,20 @@ const CreateAssetSchema = z.object({
   rental_company: z.string().optional().nullable(),
   serialNumber: z.string().optional(),
   hostname: z.string().optional(),
-  ipAddress: z.string().optional(),
+  ipAddress: z.string().trim().refine((value) => value === '' || isIP(value) === 4, 'IPv4 inválido').optional(),
+  macAddress: z.string().trim().transform((value, ctx) => {
+    if (value === '') return undefined;
+    const normalized = normalizeMacAddress(value);
+    if (!normalized) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'MAC Address inválido' });
+      return z.NEVER;
+    }
+    return normalized;
+  }).optional(),
+  monitoringEnabled: z.boolean().optional(),
   category: z.string().min(2, 'Categoria é obrigatória'),
   status: z.nativeEnum(AssetStatus).optional().default(AssetStatus.OPERATIONAL),
-  locationId: z.string().optional(),
+  locationId: OptionalRelationIdSchema,
   companyId: z.string().optional(),
   assignedToId: z.string().optional(),
   imageUrl: z.string().optional(),
@@ -60,6 +78,8 @@ assetRouter.get('/', async (req: Request, res: Response) => {
         { serialNumber: { contains: String(search), mode: 'insensitive' } },
         { hostname: { contains: String(search), mode: 'insensitive' } },
         { ipAddress: { contains: String(search), mode: 'insensitive' } },
+        { currentIp: { contains: String(search), mode: 'insensitive' } },
+        { macAddress: { contains: String(search), mode: 'insensitive' } },
       ];
     }
 
@@ -68,6 +88,7 @@ assetRouter.get('/', async (req: Request, res: Response) => {
       include: {
         location: { select: { id: true, name: true, building: true, room: true } },
         assignedTo: { select: { id: true, name: true, email: true } },
+        ipHistory: { orderBy: { detectedAt: 'desc' }, take: 10 },
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -377,6 +398,27 @@ assetRouter.post('/', async (req: Request, res: Response) => {
       companyId = company.id;
     }
 
+    if (parsed.data.locationId) {
+      const location = await prisma.location.findFirst({
+        where: { id: parsed.data.locationId, companyId },
+        select: { id: true },
+      });
+      if (!location) {
+        return res.status(400).json({
+          error: 'A localização selecionada não existe mais. Selecione outra localização.',
+          code: 'INVALID_LOCATION',
+        });
+      }
+    }
+
+    if (parsed.data.monitoringEnabled && !parsed.data.macAddress) {
+      return res.status(400).json({ error: 'Informe um MAC Address para ativar o monitoramento.' });
+    }
+    if (parsed.data.macAddress) {
+      const owner = await findMacOwner(parsed.data.macAddress);
+      if (owner) return res.status(409).json({ error: `MAC Address já cadastrado em ${owner.name} (${owner.code}).` });
+    }
+
     const existing = await prisma.asset.findUnique({ where: { code: parsed.data.code } });
     if (existing) {
       return res.status(400).json({ error: 'Já existe um ativo com este código de identificação' });
@@ -403,10 +445,14 @@ assetRouter.post('/', async (req: Request, res: Response) => {
         assetTag: parsed.data.assetTag,
         serialNumber: parsed.data.serialNumber,
         hostname: parsed.data.hostname,
-        ipAddress: parsed.data.ipAddress,
+        ipAddress: parsed.data.ipAddress || undefined,
+        currentIp: parsed.data.ipAddress || undefined,
+        macAddress: parsed.data.macAddress,
+        monitoringEnabled: parsed.data.monitoringEnabled ?? Boolean(parsed.data.macAddress),
+        ...(parsed.data.ipAddress ? { ipHistory: { create: { ipAddress: parsed.data.ipAddress } } } : {}),
         category: parsed.data.category,
         status: parsed.data.status,
-        locationId: parsed.data.locationId,
+        locationId: parsed.data.locationId ?? null,
         companyId,
         assignedToId: parsed.data.assignedToId,
         imageUrl,
@@ -421,6 +467,10 @@ assetRouter.post('/', async (req: Request, res: Response) => {
     return res.status(201).json(newAsset);
   } catch (error: any) {
     console.error('Error creating asset:', error);
+    if (error?.code === 'P2002') return res.status(409).json({ error: 'MAC Address ou código já cadastrado' });
+    if (error?.code === 'P2003' && String(error?.meta?.field_name || '').includes('locationId')) {
+      return res.status(400).json({ error: 'A localização selecionada não existe mais. Selecione outra localização.', code: 'INVALID_LOCATION' });
+    }
     return res.status(500).json({ error: 'Erro ao criar ativo' });
   }
 });
@@ -434,7 +484,7 @@ assetRouter.patch('/:id', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Dados inválidos', details: parsed.error.format() });
     }
 
-    const existing = await prisma.asset.findUnique({ where: { id }, select: { companyId: true } });
+    const existing = await prisma.asset.findUnique({ where: { id }, select: { companyId: true, currentIp: true, macAddress: true, monitoringEnabled: true } });
     if (!existing) {
       return res.status(404).json({ error: 'Ativo não encontrado' });
     }
@@ -442,7 +492,33 @@ assetRouter.patch('/:id', async (req: Request, res: Response) => {
       return res.status(403).json({ error: 'Acesso negado' });
     }
 
-    const updateData = { ...parsed.data };
+    if (parsed.data.locationId) {
+      const location = await prisma.location.findFirst({
+        where: { id: parsed.data.locationId, companyId: existing.companyId },
+        select: { id: true },
+      });
+      if (!location) {
+        return res.status(400).json({
+          error: 'A localização selecionada não existe mais. Selecione outra localização.',
+          code: 'INVALID_LOCATION',
+        });
+      }
+    }
+
+    const resultingMac = parsed.data.macAddress === undefined ? existing.macAddress : parsed.data.macAddress;
+    const resultingMonitoring = parsed.data.monitoringEnabled === undefined ? existing.monitoringEnabled : parsed.data.monitoringEnabled;
+    if (resultingMonitoring && !resultingMac) {
+      return res.status(400).json({ error: 'Informe um MAC Address para ativar o monitoramento.' });
+    }
+    if (parsed.data.macAddress) {
+      const owner = await findMacOwner(parsed.data.macAddress, { kind: 'ASSET', id });
+      if (owner) return res.status(409).json({ error: `MAC Address já cadastrado em ${owner.name} (${owner.code}).` });
+    }
+
+    const updateData = {
+      ...parsed.data,
+      ...(parsed.data.ipAddress !== undefined ? { currentIp: parsed.data.ipAddress || null, ipAddress: parsed.data.ipAddress || null } : {}),
+    };
     if (req.user?.role !== Role.SUPERADMIN) {
       delete updateData.companyId;
     }
@@ -467,6 +543,13 @@ assetRouter.patch('/:id', async (req: Request, res: Response) => {
       },
     });
 
+    if (parsed.data.ipAddress && parsed.data.ipAddress !== existing.currentIp) {
+      await prisma.$transaction([
+        prisma.deviceIpHistory.updateMany({ where: { deviceId: id, lostAt: null }, data: { lostAt: new Date() } }),
+        prisma.deviceIpHistory.create({ data: { deviceId: id, ipAddress: parsed.data.ipAddress } }),
+      ]);
+    }
+
     if (parsed.data.status) {
       emitAssetStatusUpdate({
         id: updated.id,
@@ -479,7 +562,11 @@ assetRouter.patch('/:id', async (req: Request, res: Response) => {
     }
 
     return res.json(updated);
-  } catch (error) {
+  } catch (error: any) {
+    if (error?.code === 'P2002') return res.status(409).json({ error: 'MAC Address já cadastrado em outro ativo' });
+    if (error?.code === 'P2003' && String(error?.meta?.field_name || '').includes('locationId')) {
+      return res.status(400).json({ error: 'A localização selecionada não existe mais. Selecione outra localização.', code: 'INVALID_LOCATION' });
+    }
     return res.status(500).json({ error: 'Erro ao atualizar ativo' });
   }
 });

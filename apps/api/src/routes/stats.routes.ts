@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../lib/prisma';
-import { AssetStatus, VisitStatus, IssueSeverity } from '@prisma/client';
+import { AssetStatus, DeviceMonitoringStatus, VisitStatus, IssueSeverity } from '@prisma/client';
 
 export const statsRouter = Router();
 
@@ -53,10 +53,16 @@ statsRouter.get('/dashboard', async (_req: Request, res: Response) => {
     ]);
 
     // Calculate Asset Health Rate
-    const healthRate = totalAssets > 0 ? Math.round((operationalAssets / totalAssets) * 100) : 100;
+    const healthRate = totalAssets > 0 ? Math.round((operationalAssets / totalAssets) * 100) : 0;
+    const [online, degraded, unknown, offline] = await Promise.all([
+      prisma.asset.count({ where: { monitoringEnabled: true, monitoringStatus: DeviceMonitoringStatus.ONLINE } }),
+      prisma.asset.count({ where: { monitoringEnabled: true, monitoringStatus: DeviceMonitoringStatus.DEGRADED } }),
+      prisma.asset.count({ where: { monitoringEnabled: true, monitoringStatus: DeviceMonitoringStatus.UNKNOWN } }),
+      prisma.asset.count({ where: { monitoringEnabled: true, monitoringStatus: DeviceMonitoringStatus.OFFLINE } }),
+    ]);
 
     // Calculate Conciliation Rate
-    const conciliationRate = completedVisits > 0 ? 98 : 100;
+    const conciliationRate = completedVisits > 0 ? 98 : 0;
 
     // Asset distribution by category
     const categoriesCount: Record<string, number> = {};
@@ -72,6 +78,7 @@ statsRouter.get('/dashboard', async (_req: Request, res: Response) => {
         critical: criticalAssets,
         healthRate,
         categoriesCount,
+        monitoring: { online, degraded, unknown, offline },
       },
       visits: {
         total: totalVisits,

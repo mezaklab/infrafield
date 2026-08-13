@@ -303,8 +303,8 @@ export const Visits: React.FC = () => {
 
       {/* New Visit Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 max-w-md w-full shadow-2xl relative">
+        <div className="responsive-modal-backdrop">
+          <div className="responsive-modal-panel max-w-md relative">
             <button
               onClick={() => setIsModalOpen(false)}
               className="absolute top-5 right-5 p-2 text-slate-400 hover:text-white rounded-xl bg-slate-800"
@@ -355,7 +355,7 @@ export const Visits: React.FC = () => {
                 </select>
               </div>
 
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-semibold text-slate-300 mb-1">Tipo</label>
                   <select

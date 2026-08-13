@@ -12,6 +12,7 @@ import {
   Clock,
   CheckCircle2,
   XCircle
+  ,MapPin
 } from 'lucide-react';
 import { api } from '../../services/api';
 import { Ticket, TicketStatus, TicketPriority, SystemUser } from '../../types';
@@ -31,6 +32,10 @@ interface UploadedFile {
   mimetype: string;
 }
 
+interface SectorOption { id: string; name: string }
+interface LocationOption { id: string; name: string }
+interface CategoryOption { id: string; name: string }
+
 export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({
   ticketId,
   isOpen,
@@ -42,6 +47,9 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({
 
   const [ticket, setTicket] = useState<Ticket | null>(null);
   const [technicians, setTechnicians] = useState<SystemUser[]>([]);
+  const [sectors, setSectors] = useState<SectorOption[]>([]);
+  const [locations, setLocations] = useState<LocationOption[]>([]);
+  const [categories, setCategories] = useState<CategoryOption[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
 
   // Message reply state
@@ -81,9 +89,37 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({
     }
   };
 
+  const fetchSectors = async () => {
+    try {
+      const res = await api.get<{ data: SectorOption[] }>('/sectors');
+      setSectors(res.data?.data || []);
+    } catch {
+      setError('Não foi possível carregar os setores.');
+    }
+  };
+  const fetchLocations = async () => {
+    try {
+      const res = await api.get<LocationOption[]>('/tickets/locations');
+      setLocations(res.data || []);
+    } catch {
+      setError('Não foi possível carregar as localidades.');
+    }
+  };
+  const fetchCategories = async () => {
+    try {
+      const res = await api.get<{ data: CategoryOption[] }>('/categories');
+      setCategories(res.data?.data || []);
+    } catch {
+      setError('Não foi possível carregar as categorias.');
+    }
+  };
+
   useEffect(() => {
     if (isOpen && ticketId) {
       fetchTicketDetails();
+      fetchSectors();
+      fetchLocations();
+      fetchCategories();
       if (canManageTicket) {
         fetchTechnicians();
       }
@@ -104,7 +140,7 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({
       await fetchTicketDetails();
       onTicketUpdated();
     } catch (err) {
-      alert('Erro ao atualizar status do chamado.');
+      setError('Erro ao atualizar status do chamado.');
     } finally {
       setIsUpdatingStatus(false);
     }
@@ -117,7 +153,48 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({
       await fetchTicketDetails();
       onTicketUpdated();
     } catch (err) {
-      alert('Erro ao atribuir técnico responsável.');
+      setError('Erro ao atribuir técnico responsável.');
+    } finally {
+      setIsUpdatingStatus(false);
+    }
+  };
+
+  const handleLocationChange = async (locationId: string) => {
+    try {
+      setIsUpdatingStatus(true);
+      await api.patch(`/tickets/${ticketId}`, { locationId });
+      await fetchTicketDetails();
+      onTicketUpdated();
+    } catch {
+      setError('Erro ao atualizar localização do chamado.');
+    } finally {
+      setIsUpdatingStatus(false);
+    }
+  };
+
+  const handleSectorChange = async (newSectorId: string) => {
+    try {
+      setIsUpdatingStatus(true);
+      setError(null);
+      await api.patch(`/tickets/${ticketId}`, { sectorId: newSectorId });
+      await fetchTicketDetails();
+      onTicketUpdated();
+    } catch (err: any) {
+      setError(err.response?.data?.error || 'Erro ao atualizar o setor do chamado.');
+    } finally {
+      setIsUpdatingStatus(false);
+    }
+  };
+
+  const handleCategoryChange = async (newCategoryId: string) => {
+    try {
+      setIsUpdatingStatus(true);
+      setError(null);
+      await api.patch(`/tickets/${ticketId}`, { categoryId: newCategoryId });
+      await fetchTicketDetails();
+      onTicketUpdated();
+    } catch (err: any) {
+      setError(err.response?.data?.error || 'Erro ao atualizar a categoria do chamado.');
     } finally {
       setIsUpdatingStatus(false);
     }
@@ -283,8 +360,8 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 md:p-6 bg-slate-950/80 backdrop-blur-md animate-fadeIn">
-      <div className="bg-[#080d1a] border border-cyan-500/30 rounded-3xl max-w-4xl w-full h-[90vh] flex flex-col shadow-2xl overflow-hidden">
+    <div className="responsive-modal-backdrop animate-fadeIn">
+      <div className="bg-[#080d1a] border border-cyan-500/30 rounded-t-3xl sm:rounded-3xl max-w-4xl w-full h-[100dvh] sm:h-[90dvh] flex flex-col shadow-2xl overflow-hidden">
         
         {/* TOP HEADER METADATA BAR */}
         <div className="p-5 bg-slate-900/90 border-b border-slate-800 flex flex-col gap-4">
@@ -308,7 +385,7 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({
 
           {/* Detailed Info Grid */}
           {ticket && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 text-xs bg-[#050811] p-3.5 rounded-2xl border border-slate-800/80 font-mono">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 text-xs bg-[#050811] p-3.5 rounded-2xl border border-slate-800/80 font-mono">
               <div>
                 <span className="text-[10px] text-slate-500 font-sans block font-semibold">Solicitante (Autor)</span>
                 <span className="text-white font-bold block truncate">{ticket.author?.name}</span>
@@ -316,8 +393,50 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({
               </div>
 
               <div>
-                <span className="text-[10px] text-slate-500 font-sans block font-semibold">Setor &amp; Ativo Afetado</span>
-                <span className="text-cyan-300 font-bold block truncate">{ticket.location?.name || 'Não Especificado'}</span>
+                <span className="text-[10px] text-slate-500 font-sans block font-semibold">Setor</span>
+                {canManageTicket && ticket.sectorId ? (
+                  <select
+                    disabled={isUpdatingStatus}
+                    value={ticket.sectorId}
+                    onChange={(e) => handleSectorChange(e.target.value)}
+                    className="w-full max-w-full mt-0.5 bg-slate-900 border border-slate-800 text-cyan-300 font-bold rounded-lg px-2 py-1 outline-none text-xs"
+                  >
+                    {sectors.map((sector) => <option key={sector.id} value={sector.id}>{sector.name}</option>)}
+                  </select>
+                ) : (
+                  <span className="text-cyan-300 font-bold block truncate">{ticket.sector?.name || 'Não especificado'}</span>
+                )}
+              </div>
+
+              <div>
+                <span className="text-[10px] text-slate-500 font-sans block font-semibold">Localização</span>
+                {canManageTicket ? (
+                  <select disabled={isUpdatingStatus} value={ticket.locationId || ''} onChange={(e) => handleLocationChange(e.target.value)} className="w-full max-w-full mt-0.5 bg-slate-900 border border-slate-800 text-cyan-300 font-bold rounded-lg px-2 py-1 outline-none text-xs">
+                    <option value="" disabled>Selecione...</option>
+                    {locations.map((location) => <option key={location.id} value={location.id}>{location.name}</option>)}
+                  </select>
+                ) : <span className="text-cyan-300 font-bold block truncate"><MapPin className="inline h-3 w-3 mr-1" />{ticket.location?.name || 'Não especificada'}</span>}
+              </div>
+
+              <div>
+                <span className="text-[10px] text-slate-500 font-sans block font-semibold">Categoria</span>
+                {canManageTicket ? (
+                  <select
+                    disabled={isUpdatingStatus}
+                    value={ticket.categoryId || ''}
+                    onChange={(e) => handleCategoryChange(e.target.value)}
+                    className="w-full max-w-full mt-0.5 bg-slate-900 border border-slate-800 text-cyan-300 font-bold rounded-lg px-2 py-1 outline-none text-xs"
+                  >
+                    <option value="" disabled>Não especificada</option>
+                    {categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
+                  </select>
+                ) : (
+                  <span className="text-cyan-300 font-bold block truncate">{ticket.categoryRef?.name || ticket.category || 'Não especificada'}</span>
+                )}
+              </div>
+
+              <div>
+                <span className="text-[10px] text-slate-500 font-sans block font-semibold">Ativo Afetado</span>
                 <span className="text-purple-300 text-[11px] truncate block font-bold">
                   {ticket.asset ? `💻 ${ticket.asset.name} (${ticket.asset.code})` : ticket.location?.room || ticket.location?.building || 'Infraestrutura'}
                 </span>

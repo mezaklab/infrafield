@@ -30,25 +30,25 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateTab })
       }
     } catch (err: any) {
       console.warn('Backend admin stats fallback:', err);
-      // Mock stats fallback for initial setup or offline
+      // Fallback para zeros se a API falhar
       setStats({
-        totalUsers: 5,
-        totalAssets: 5,
-        totalPeripherals: 5,
-        totalVisits: 2,
-        totalIssues: 2,
-        auditLogsCount: 24,
+        totalUsers: 0,
+        totalAssets: 0,
+        totalPeripherals: 0,
+        totalVisits: 0,
+        totalIssues: 0,
+        auditLogsCount: 0,
         usersByRole: {
-          SUPERADMIN: 1,
-          ADMIN: 1,
-          MANAGER: 1,
-          TECHNICIAN: 1,
-          VIEWER: 1,
+          SUPERADMIN: 0,
+          ADMIN: 0,
+          MANAGER: 0,
+          TECHNICIAN: 0,
+          VIEWER: 0,
         },
-        systemHealth: 'OPERATIONAL',
-        serverUptimeSeconds: 14200,
+        systemHealth: 'UNAVAILABLE',
+        serverUptimeSeconds: 0,
         environment: 'development',
-        dbConnection: 'HEALTHY',
+        dbConnection: 'ERROR',
       });
     } finally {
       setLoading(false);
@@ -75,17 +75,17 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateTab })
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       {/* Top Banner */}
-      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-purple-900/60 via-indigo-900/50 to-slate-900 p-6 md:p-8 border border-purple-500/30 shadow-2xl">
+      <div className="admin-hero surface-ambient relative overflow-hidden rounded-2xl p-6 md:p-8">
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div className="space-y-2">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-purple-500/20 text-purple-300 text-xs font-mono font-bold border border-purple-500/40">
+            <div className="inline-flex items-center gap-2 text-xs font-semibold admin-action">
               <ShieldCheck className="w-4 h-4 text-purple-400" />
-              <span>CENTRAL DE GESTÃO E CONTROLE</span>
+              <span>InfraField Core · Administração</span>
             </div>
             <h1 className="text-2xl md:text-3xl font-black text-white tracking-tight">
-              Gestão Central - InfraField v0.4
+              Gestão Central do InfraField
             </h1>
             <p className="text-sm text-slate-300 max-w-2xl">
               Gerencie usuários, acessos, logs do sistema e configurações avançadas da plataforma.
@@ -111,21 +111,21 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateTab })
         </div>
 
         {/* Subtle decorative glow */}
-        <div className="absolute top-0 right-0 w-96 h-96 bg-purple-600/10 rounded-full blur-3xl -z-10 pointer-events-none" />
+        <div className="absolute top-0 right-0 w-72 h-72 bg-purple-600/10 rounded-full blur-3xl -z-10 pointer-events-none" />
       </div>
 
       {/* Main KPI Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Total Users */}
-        <div className="bg-slate-900/80 border border-purple-900/40 rounded-2xl p-5 shadow-lg space-y-3">
+        <div className="admin-surface admin-kpi rounded-2xl p-5 space-y-3">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Total de Usuários</span>
-            <div className="p-2 rounded-xl bg-purple-500/10 text-purple-400 border border-purple-500/20">
+            <div className="icon-box h-10 w-10 rounded-xl bg-purple-500/10 text-purple-400 border border-purple-500/20">
               <Users className="w-5 h-5" />
             </div>
           </div>
           <div className="flex items-baseline gap-2">
-            <span className="text-3xl font-black text-white">{stats?.totalUsers || 0}</span>
+            <span className="metric-number text-3xl font-black text-white">{stats?.totalUsers || 0}</span>
             <span className="text-xs font-semibold text-purple-400 font-mono">cadastrados</span>
           </div>
           <p className="text-xs text-slate-400 pt-1 border-t border-slate-800 flex justify-between">
@@ -135,15 +135,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateTab })
         </div>
 
         {/* Audit Logs */}
-        <div className="bg-slate-900/80 border border-indigo-900/40 rounded-2xl p-5 shadow-lg space-y-3">
+        <div className="admin-surface admin-kpi rounded-2xl p-5 space-y-3">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Eventos Auditados</span>
-            <div className="p-2 rounded-xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+            <div className="icon-box h-10 w-10 rounded-xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
               <FileText className="w-5 h-5" />
             </div>
           </div>
           <div className="flex items-baseline gap-2">
-            <span className="text-3xl font-black text-white">{stats?.auditLogsCount || 0}</span>
+            <span className="metric-number text-3xl font-black text-white">{stats?.auditLogsCount || 0}</span>
             <span className="text-xs font-semibold text-indigo-400 font-mono">registros</span>
           </div>
           <p className="text-xs text-slate-400 pt-1 border-t border-slate-800 flex justify-between">
@@ -155,15 +155,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateTab })
         </div>
 
         {/* System Uptime */}
-        <div className="bg-slate-900/80 border border-cyan-900/40 rounded-2xl p-5 shadow-lg space-y-3">
+        <div className="admin-surface admin-kpi rounded-2xl p-5 space-y-3">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Uptime do Servidor</span>
-            <div className="p-2 rounded-xl bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
+            <div className="icon-box h-10 w-10 rounded-xl bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
               <Clock className="w-5 h-5" />
             </div>
           </div>
           <div className="flex items-baseline gap-2">
-            <span className="text-3xl font-black text-white">{formatUptime(stats?.serverUptimeSeconds || 0)}</span>
+            <span className="metric-number text-3xl font-black text-white">{formatUptime(stats?.serverUptimeSeconds || 0)}</span>
           </div>
           <p className="text-xs text-slate-400 pt-1 border-t border-slate-800 flex justify-between">
             <span>Ambiente:</span>
@@ -172,10 +172,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateTab })
         </div>
 
         {/* DB & API Status */}
-        <div className="bg-slate-900/80 border border-emerald-900/40 rounded-2xl p-5 shadow-lg space-y-3">
+        <div className="admin-surface admin-kpi rounded-2xl p-5 space-y-3">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Status do Banco</span>
-            <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+            <div className="icon-box h-10 w-10 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
               <Database className="w-5 h-5" />
             </div>
           </div>
@@ -193,7 +193,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateTab })
       {/* Role Distribution & Global Control Panel */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* User Roles Breakdown */}
-        <div className="bg-slate-900/80 border border-purple-900/40 rounded-3xl p-6 shadow-xl space-y-5 lg:col-span-2">
+        <div className="admin-surface-elevated rounded-2xl p-5 sm:p-6 space-y-5 lg:col-span-2">
           <div className="flex items-center justify-between pb-3 border-b border-slate-800">
             <div>
               <h3 className="text-base font-bold text-white flex items-center gap-2">
@@ -225,7 +225,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateTab })
               <div className="w-full bg-slate-800 h-2.5 rounded-full overflow-hidden">
                 <div 
                   className="bg-amber-400 h-full rounded-full transition-all" 
-                  style={{ width: `${Math.min(100, ((stats?.usersByRole.SUPERADMIN || 1) / (stats?.totalUsers || 1)) * 100)}%` }}
+                  style={{ width: `${Math.min(100, ((stats?.usersByRole.SUPERADMIN || 0) / Math.max(stats?.totalUsers || 0, 1)) * 100)}%` }}
                 />
               </div>
             </div>
@@ -242,7 +242,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateTab })
               <div className="w-full bg-slate-800 h-2.5 rounded-full overflow-hidden">
                 <div 
                   className="bg-purple-500 h-full rounded-full transition-all" 
-                  style={{ width: `${Math.min(100, ((stats?.usersByRole.ADMIN || 1) / (stats?.totalUsers || 1)) * 100)}%` }}
+                  style={{ width: `${Math.min(100, ((stats?.usersByRole.ADMIN || 0) / Math.max(stats?.totalUsers || 0, 1)) * 100)}%` }}
                 />
               </div>
             </div>
@@ -256,7 +256,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateTab })
               <div className="w-full bg-slate-800 h-2.5 rounded-full overflow-hidden">
                 <div 
                   className="bg-cyan-500 h-full rounded-full transition-all" 
-                  style={{ width: `${Math.min(100, ((stats?.usersByRole.MANAGER || 1) / (stats?.totalUsers || 1)) * 100)}%` }}
+                  style={{ width: `${Math.min(100, ((stats?.usersByRole.MANAGER || 0) / Math.max(stats?.totalUsers || 0, 1)) * 100)}%` }}
                 />
               </div>
             </div>
@@ -270,7 +270,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateTab })
               <div className="w-full bg-slate-800 h-2.5 rounded-full overflow-hidden">
                 <div 
                   className="bg-blue-500 h-full rounded-full transition-all" 
-                  style={{ width: `${Math.min(100, ((stats?.usersByRole.TECHNICIAN || 1) / (stats?.totalUsers || 1)) * 100)}%` }}
+                  style={{ width: `${Math.min(100, ((stats?.usersByRole.TECHNICIAN || 0) / Math.max(stats?.totalUsers || 0, 1)) * 100)}%` }}
                 />
               </div>
             </div>
@@ -284,7 +284,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateTab })
               <div className="w-full bg-slate-800 h-2.5 rounded-full overflow-hidden">
                 <div 
                   className="bg-slate-500 h-full rounded-full transition-all" 
-                  style={{ width: `${Math.min(100, ((stats?.usersByRole.VIEWER || 1) / (stats?.totalUsers || 1)) * 100)}%` }}
+                  style={{ width: `${Math.min(100, ((stats?.usersByRole.VIEWER || 0) / Math.max(stats?.totalUsers || 0, 1)) * 100)}%` }}
                 />
               </div>
             </div>
@@ -292,7 +292,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateTab })
         </div>
 
         {/* Quick Action Navigation Card */}
-        <div className="bg-slate-900/80 border border-purple-900/40 rounded-3xl p-6 shadow-xl space-y-4">
+        <div className="admin-surface-elevated rounded-2xl p-5 sm:p-6 space-y-4">
           <h3 className="text-base font-bold text-white flex items-center gap-2 pb-3 border-b border-slate-800">
             <SettingsIcon className="w-5 h-5 text-purple-400" />
             <span>Ações Rápidas ADM</span>
@@ -301,7 +301,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateTab })
           <div className="space-y-3">
             <button
               onClick={() => onNavigateTab('users')}
-              className="w-full flex items-center justify-between p-3.5 rounded-2xl bg-slate-800/80 hover:bg-slate-800 border border-slate-700/60 transition-all text-left group"
+              className="admin-quick-action w-full flex items-center justify-between p-3.5 rounded-xl text-left group"
             >
               <div className="flex items-center gap-3">
                 <div className="p-2 rounded-xl bg-purple-500/10 text-purple-400">
@@ -317,7 +317,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateTab })
 
             <button
               onClick={() => onNavigateTab('audit-logs')}
-              className="w-full flex items-center justify-between p-3.5 rounded-2xl bg-slate-800/80 hover:bg-slate-800 border border-slate-700/60 transition-all text-left group"
+              className="admin-quick-action w-full flex items-center justify-between p-3.5 rounded-xl text-left group"
             >
               <div className="flex items-center gap-3">
                 <div className="p-2 rounded-xl bg-indigo-500/10 text-indigo-400">
@@ -333,7 +333,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateTab })
 
             <button
               onClick={() => onNavigateTab('settings')}
-              className="w-full flex items-center justify-between p-3.5 rounded-2xl bg-slate-800/80 hover:bg-slate-800 border border-slate-700/60 transition-all text-left group"
+              className="admin-quick-action w-full flex items-center justify-between p-3.5 rounded-xl text-left group"
             >
               <div className="flex items-center gap-3">
                 <div className="p-2 rounded-xl bg-cyan-500/10 text-cyan-400">

@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { Role } from '@prisma/client';
 import { JWT_AUDIENCE, JWT_ISSUER, JWT_SECRET } from '../config/security';
+import { prisma } from '../lib/prisma';
 
 export interface JwtPayload {
   userId: string;
@@ -9,6 +10,8 @@ export interface JwtPayload {
   username?: string;
   role: Role;
   companyId: string;
+  accessRoleId?: string | null;
+  permissions?: string[];
 }
 
 // Extend Express Request to carry authenticated user data
@@ -24,7 +27,7 @@ declare global {
  * Validates the Bearer JWT token present in Authorization header.
  * Sets req.user if valid, returns 401 otherwise.
  */
-export function requireAuth(req: Request, res: Response, next: NextFunction): void {
+export async function requireAuth(req: Request, res: Response, next: NextFunction): Promise<void> {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     res.status(401).json({ error: 'Token de autenticação não encontrado. Faça login novamente.' });
@@ -46,11 +49,37 @@ export function requireAuth(req: Request, res: Response, next: NextFunction): vo
     if (!decoded.userId || !decoded.companyId || !decoded.role || !decoded.email) {
       throw new Error('Payload JWT incompleto.');
     }
-    req.user = decoded;
+    const user = await prisma.user.findUnique({
+      where: { id: decoded.userId },
+      select: {
+        id: true, email: true, username: true, role: true, companyId: true, isActive: true, accessRoleId: true,
+        accessRole: { select: { enabled: true, permissions: { select: { permission: { select: { key: true } } } } } },
+      },
+    });
+    if (!user || !user.isActive || (user.accessRole && !user.accessRole.enabled)) {
+      res.status(401).json({ error: 'Usuário ou cargo inativo.' });
+      return;
+    }
+    req.user = {
+      userId: user.id, email: user.email, username: user.username || undefined,
+      role: user.role, companyId: user.companyId, accessRoleId: user.accessRoleId,
+      permissions: user.role === Role.SUPERADMIN ? ['*'] : user.accessRole?.permissions.map((item) => item.permission.key) || [],
+    };
     next();
   } catch (err) {
     res.status(401).json({ error: 'Token inválido ou expirado. Faça login novamente.' });
   }
+}
+
+export function requirePermission(permission: string) {
+  return (req: Request, res: Response, next: NextFunction): void => {
+    if (!req.user) { res.status(401).json({ error: 'Não autenticado.' }); return; }
+    if (req.user.role === Role.SUPERADMIN || req.user.permissions?.includes('*') || req.user.permissions?.includes(permission)) {
+      next();
+      return;
+    }
+    res.status(403).json({ error: 'Permissão insuficiente.', required: permission });
+  };
 }
 
 /**

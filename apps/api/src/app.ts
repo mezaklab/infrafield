@@ -4,7 +4,7 @@ import helmet from 'helmet';
 import path from 'path';
 import fs from 'fs';
 import { routes } from './routes';
-import { getAllowedOrigins } from './config/security';
+import { getAllowedOrigins, isCorsOriginAllowed } from './config/security';
 import { apiRateLimiter } from './middlewares/rateLimit.middleware';
 
 export const createApp = (): Express => {
@@ -22,8 +22,7 @@ export const createApp = (): Express => {
   // CORS configuration
   app.use(cors({
     origin: (origin, callback) => {
-      const normalizedOrigin = origin?.replace(/\/+$/, '');
-      if (!normalizedOrigin || allowedOrigins.includes(normalizedOrigin)) {
+      if (isCorsOriginAllowed(origin, { allowedOrigins })) {
         callback(null, true);
         return;
       }

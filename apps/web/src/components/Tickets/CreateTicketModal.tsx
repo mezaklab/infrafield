@@ -12,11 +12,11 @@ import {
   Trash2,
   Sparkles,
   Laptop
+  ,MapPin
 } from 'lucide-react';
 import { api } from '../../services/api';
-import { Location, TicketPriority } from '../../types';
+import { TicketPriority } from '../../types';
 import { useAuth } from '../../contexts/AuthContext';
-import { getLocationFullName } from '../../utils/location';
 
 interface CreateTicketModalProps {
   isOpen: boolean;
@@ -36,21 +36,32 @@ interface CategoryOption {
   name: string;
 }
 
+interface SectorOption {
+  id: string;
+  name: string;
+}
+interface LocationOption { id: string; name: string; building?: string | null; room?: string | null }
+
 export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
   isOpen,
   onClose,
   onSuccess,
 }) => {
   const { user } = useAuth();
-  const [locations, setLocations] = useState<Location[]>([]);
+  const [sectors, setSectors] = useState<SectorOption[]>([]);
+  const [loadingSectors, setLoadingSectors] = useState<boolean>(true);
+  const [sectorsError, setSectorsError] = useState<boolean>(false);
+  const [locations, setLocations] = useState<LocationOption[]>([]);
   const [loadingLocations, setLoadingLocations] = useState<boolean>(true);
+  const [locationsError, setLocationsError] = useState<boolean>(false);
   const [categories, setCategories] = useState<CategoryOption[]>([]);
   const [loadingCategories, setLoadingCategories] = useState<boolean>(true);
 
   // Form fields
   const [subject, setSubject] = useState<string>('');
   const [description, setDescription] = useState<string>('');
-  const [category, setCategory] = useState<string>('');
+  const [categoryId, setCategoryId] = useState<string>('');
+  const [sectorId, setSectorId] = useState<string>('');
   const [locationId, setLocationId] = useState<string>('');
   const [assetId, setAssetId] = useState<string>('');
   const [priority, setPriority] = useState<TicketPriority>('MEDIA');
@@ -66,21 +77,30 @@ export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
   useEffect(() => {
     if (!isOpen) return;
 
-    // Fetch locations for dropdown
+    const fetchSectors = async () => {
+      try {
+        setLoadingSectors(true);
+        setSectorsError(false);
+        const res = await api.get<{ success: boolean; data: SectorOption[] }>('/sectors');
+        setSectors(res.data?.data || []);
+      } catch (err) {
+        console.warn('Failed to load sectors for ticket creation:', err);
+        setSectors([]);
+        setSectorsError(true);
+      } finally {
+        setLoadingSectors(false);
+      }
+    };
     const fetchLocations = async () => {
       try {
         setLoadingLocations(true);
-        const res = await api.get<Location[]>('/locations');
+        setLocationsError(false);
+        const res = await api.get<LocationOption[]>('/tickets/locations');
         setLocations(res.data || []);
-        
-        // Auto select user's location if assigned, else first location in list
-        if (user?.locationId) {
-          setLocationId(user.locationId);
-        } else if (res.data && res.data.length > 0) {
-          setLocationId(res.data[0].id);
-        }
       } catch (err) {
         console.warn('Failed to load locations for ticket creation:', err);
+        setLocations([]);
+        setLocationsError(true);
       } finally {
         setLoadingLocations(false);
       }
@@ -93,19 +113,19 @@ export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
         const res = await api.get<{ success: boolean; data: CategoryOption[] }>('/categories');
         const list = res.data?.data || [];
         setCategories(list);
-        if (list.length > 0) {
-          setCategory(list[0].name);
-        } else {
-          setCategory('Outros');
-        }
+        setCategoryId(list[0]?.id || '');
       } catch (err) {
         console.warn('Failed to load categories:', err);
-        setCategory('Outros');
+        setCategories([]);
+        setCategoryId('');
       } finally {
         setLoadingCategories(false);
       }
     };
 
+    setSectorId('');
+    setLocationId('');
+    fetchSectors();
     fetchLocations();
     fetchCategories();
   }, [isOpen, user]);
@@ -148,8 +168,16 @@ export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
     e.preventDefault();
     setError(null);
 
+    if (!sectorId) {
+      setError('O campo Setor é obrigatório.');
+      return;
+    }
     if (!locationId) {
-      setError('O campo Setor / Localização é obrigatório.');
+      setError('O campo Localização é obrigatório.');
+      return;
+    }
+    if (!categoryId) {
+      setError('O campo Categoria é obrigatório.');
       return;
     }
     if (!subject.trim()) {
@@ -168,7 +196,8 @@ export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
       await api.post('/tickets', {
         subject: subject.trim(),
         description: description.trim(),
-        category,
+        categoryId,
+        sectorId,
         locationId,
         assetId: assetId || undefined,
         priority,
@@ -178,7 +207,9 @@ export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
       // Reset form
       setSubject('');
       setDescription('');
-      setCategory('Wi-Fi / Rede');
+      setCategoryId('');
+      setSectorId('');
+      setLocationId('');
       setAssetId('');
       setAttachments([]);
       onSuccess();
@@ -192,8 +223,8 @@ export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-fadeIn">
-      <div className="bg-[#080d1a] border border-cyan-500/30 rounded-3xl max-w-2xl w-full p-6 md:p-8 space-y-6 shadow-2xl overflow-y-auto max-h-[90vh] custom-scrollbar">
+    <div className="responsive-modal-backdrop animate-fadeIn">
+      <div className="responsive-modal-panel bg-[#080d1a] border-cyan-500/30 max-w-2xl space-y-5 custom-scrollbar">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-slate-800/80 pb-4">
           <div className="flex items-center gap-3">
@@ -245,34 +276,51 @@ export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
 
         <form onSubmit={handleSubmit} className="space-y-4 text-xs">
           {/* Setor e Categoria */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {/* Setor / Localização (Obrigatório) */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {/* Setor (Obrigatório) */}
             <div className="space-y-1.5">
               <label className="text-slate-300 font-bold flex items-center gap-1.5">
                 <Building2 className="w-4 h-4 text-cyan-400" />
-                <span>Setor / Localização do Problema *</span>
+                <span>Setor *</span>
               </label>
               <div className="relative">
                 <select
                   required
-                  disabled={loadingLocations}
-                  value={locationId}
-                  onChange={(e) => setLocationId(e.target.value)}
-                  className="w-full px-3.5 py-3 rounded-xl bg-[#050811] border border-slate-800 text-white font-semibold outline-none focus:border-cyan-500 transition-colors"
+                  disabled={loadingSectors || sectorsError || sectors.length === 0}
+                  value={sectorId}
+                  onChange={(e) => setSectorId(e.target.value)}
+                  className="w-full max-w-full px-3.5 py-3 rounded-xl bg-[#050811] border border-slate-800 text-white font-semibold outline-none focus:border-cyan-500 transition-colors disabled:opacity-60"
                 >
-                  <option value="">Selecione a Localidade / Setor *</option>
-                  {/* Corporate Locations */}
-                  {locations.length > 0 && (
-                    <optgroup label="Localidades Corporativas">
-                      {locations.map((loc) => (
-                        <option key={`loc-${loc.id}`} value={loc.id}>
-                          {getLocationFullName(loc, locations)} {loc.room ? `(${loc.room})` : ''}
-                        </option>
-                      ))}
-                    </optgroup>
-                  )}
+                  <option value="">Selecione o setor...</option>
+                  {sectors.map((sector) => (
+                    <option key={sector.id} value={sector.id}>{sector.name}</option>
+                  ))}
                 </select>
               </div>
+              {loadingSectors && <p className="text-slate-400">Carregando setores...</p>}
+              {!loadingSectors && sectorsError && <p className="text-rose-300">Não foi possível carregar os setores.</p>}
+              {!loadingSectors && !sectorsError && sectors.length === 0 && <p className="text-amber-300">Nenhum setor cadastrado.</p>}
+            </div>
+
+            {/* Localização física (Obrigatória) */}
+            <div className="space-y-1.5">
+              <label className="text-slate-300 font-bold flex items-center gap-1.5">
+                <MapPin className="w-4 h-4 text-cyan-400" />
+                <span>Localização *</span>
+              </label>
+              <select
+                required
+                disabled={loadingLocations || locationsError || locations.length === 0}
+                value={locationId}
+                onChange={(e) => setLocationId(e.target.value)}
+                className="w-full max-w-full px-3.5 py-3 rounded-xl bg-[#050811] border border-slate-800 text-white font-semibold outline-none focus:border-cyan-500 transition-colors disabled:opacity-60"
+              >
+                <option value="">Selecione a localização...</option>
+                {locations.map((location) => <option key={location.id} value={location.id}>{location.name}</option>)}
+              </select>
+              {loadingLocations && <p className="text-slate-400">Carregando localidades...</p>}
+              {!loadingLocations && locationsError && <p className="text-rose-300">Erro ao carregar localidades.</p>}
+              {!loadingLocations && !locationsError && locations.length === 0 && <p className="text-amber-300">Nenhuma localização cadastrada.</p>}
             </div>
 
             {/* Categoria Dinâmica */}
@@ -284,28 +332,20 @@ export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
               <div className="relative">
                 <select
                   required
-                  disabled={loadingCategories}
-                  value={category}
-                  onChange={(e) => setCategory(e.target.value)}
+                  disabled={loadingCategories || categories.length === 0}
+                  value={categoryId}
+                  onChange={(e) => setCategoryId(e.target.value)}
                   className="w-full px-3.5 py-3 rounded-xl bg-[#050811] border border-slate-800 text-white font-semibold outline-none focus:border-cyan-500 transition-colors cursor-pointer"
                 >
-                  {categories.length > 0 ? (
-                    categories.map((cat) => (
-                      <option key={cat.id} value={cat.name}>
+                  <option value="">Selecione a categoria...</option>
+                  {categories.map((cat) => (
+                      <option key={cat.id} value={cat.id}>
                         {cat.name}
                       </option>
-                    ))
-                  ) : (
-                    <>
-                      <option value="Wi-Fi / Rede">Wi-Fi / Rede</option>
-                      <option value="Computador">Computador</option>
-                      <option value="Impressora">Impressora</option>
-                      <option value="Periféricos">Periféricos</option>
-                      <option value="Outros">Outros</option>
-                    </>
-                  )}
+                    ))}
                 </select>
               </div>
+              {!loadingCategories && categories.length === 0 && <p className="text-amber-300">Nenhuma categoria cadastrada.</p>}
             </div>
           </div>
 

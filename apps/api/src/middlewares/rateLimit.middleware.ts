@@ -30,6 +30,8 @@ export const passwordRateLimiter = rateLimit({
   limit: 5,
 });
 
+export const passwordResetRequestRateLimiter = rateLimit({ ...baseOptions, windowMs: 15 * 60 * 1000, limit: 5 });
+
 export const ticketCreationRateLimiter = rateLimit({
   ...baseOptions,
   windowMs: 60 * 1000,

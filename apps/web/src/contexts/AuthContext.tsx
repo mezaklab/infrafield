@@ -14,6 +14,9 @@ export interface AuthUser {
   company: { id: string; name: string };
   locationId?: string;
   location?: Location;
+  isActive?: boolean;
+  accessRole?: { id: string; key: string; name: string } | null;
+  permissions?: string[];
 }
 
 interface AuthContextValue {
@@ -27,6 +30,7 @@ interface AuthContextValue {
   isTechnician: boolean;   // TECHNICIAN
   isFinalUser: boolean;    // USUARIO
   canAccessAdmin: boolean; // SUPERADMIN or ADMIN
+  hasPermission: (permission: string) => boolean;
   login: (username: string, password: string) => Promise<void>;
   logout: () => void;
 }
@@ -115,9 +119,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const isTechnician   = user?.role === 'TECHNICIAN';
   const isFinalUser    = user?.role === 'USUARIO';
   const canAccessAdmin = isSuperAdmin || isAdmin;
+  const hasPermission = (permission: string) => Boolean(isSuperAdmin || user?.permissions?.includes('*') || user?.permissions?.includes(permission));
 
   return (
-    <AuthContext.Provider value={{ user, token, isAuthenticated, isLoading, isSuperAdmin, isAdmin, isManager, isTechnician, isFinalUser, canAccessAdmin, login, logout }}>
+    <AuthContext.Provider value={{ user, token, isAuthenticated, isLoading, isSuperAdmin, isAdmin, isManager, isTechnician, isFinalUser, canAccessAdmin, hasPermission, login, logout }}>
       {children}
     </AuthContext.Provider>
   );

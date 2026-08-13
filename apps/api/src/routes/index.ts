@@ -18,9 +18,10 @@ import { adminRouter } from './admin.routes';
 import { settingsRouter, whatsappRouter } from './settings.routes';
 import { sectorRouter } from './sector.routes';
 import { categoryRouter } from './category.routes';
-import { requireAuth, requireRole } from '../middlewares/auth.middleware';
+import { requireAuth, requirePermission, requireRole } from '../middlewares/auth.middleware';
 import { Role } from '@prisma/client';
 import { onboardingRateLimiter } from '../middlewares/rateLimit.middleware';
+import { lensRouter } from './lens.routes';
 
 export const routes = Router();
 
@@ -38,8 +39,11 @@ routes.use('/api/locations', locationRouter);
 
 // ─── Protected Routes — require valid JWT ─────────────────────────────────────
 routes.use('/api/companies',    requireAuth, companyRouter);
-routes.use('/api/assets',       requireAuth, assetRouter);
-routes.use('/api/peripherals',  requireAuth, peripheralRouter);
+routes.use('/api/lens', requireAuth, requirePermission('devices.view'), lensRouter);
+routes.use('/api/assets', requireAuth, (req, res, next) =>
+  requirePermission(req.method === 'GET' ? 'devices.view' : req.method === 'POST' ? 'devices.create' : 'devices.manage')(req, res, next), assetRouter);
+routes.use('/api/peripherals', requireAuth, (req, res, next) =>
+  requirePermission(req.method === 'GET' ? 'devices.view' : req.method === 'POST' ? 'devices.create' : 'devices.manage')(req, res, next), peripheralRouter);
 routes.use('/api/tickets',      requireAuth, ticketRouter);
 routes.use('/api/visits',       requireAuth, visitRouter);
 routes.use('/api/stats',        requireAuth, statsRouter);
@@ -50,7 +54,9 @@ routes.use('/api/issues',       requireAuth, issueRouter);
 routes.use('/api/reports',      requireAuth, reportRouter);
 routes.use('/api/notifications', requireAuth, notificationRouter);
 routes.use('/api/settings',     requireAuth, requireRole([Role.SUPERADMIN, Role.ADMIN]), settingsRouter);
-routes.use('/api/sectors',      requireAuth, requireRole([Role.SUPERADMIN, Role.ADMIN]), sectorRouter);
+// Any authenticated user may list sectors to open a ticket. Mutation RBAC lives
+// inside sectorRouter so management remains restricted to administrators.
+routes.use('/api/sectors',      requireAuth, sectorRouter);
 routes.use('/api/categories',   requireAuth, categoryRouter);
 routes.use('/api/whatsapp',     requireAuth, requireRole([Role.SUPERADMIN, Role.ADMIN]), whatsappRouter);
 

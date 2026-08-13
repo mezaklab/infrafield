@@ -120,7 +120,7 @@ export const AdminAuditLogs: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Header Banner */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-900/80 border border-purple-900/40 rounded-2xl p-5 shadow-lg">
+      <div className="surface-elevated flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-900/80 border border-purple-900/40 rounded-2xl p-5 shadow-lg">
         <div className="flex items-center gap-3">
           <div className="p-3 rounded-xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/30">
             <FileText className="w-6 h-6" />
@@ -166,7 +166,7 @@ export const AdminAuditLogs: React.FC = () => {
       </div>
 
       {/* Audit Log Table */}
-      <div className="bg-slate-900/80 border border-purple-900/40 rounded-2xl overflow-hidden shadow-xl">
+      <div className="surface-base bg-slate-900/80 border border-purple-900/40 rounded-2xl overflow-hidden shadow-xl">
         {loading ? (
           <div className="p-12 text-center text-purple-400 flex items-center justify-center gap-2">
             <RefreshCw className="w-6 h-6 animate-spin" />
@@ -177,7 +177,9 @@ export const AdminAuditLogs: React.FC = () => {
             Nenhum evento registrado com os critérios informados.
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <>
+          <div className="md:hidden p-3 space-y-3">{filteredLogs.map((log) => <article key={log.id} className="mobile-data-card space-y-3"><div className="flex items-start justify-between gap-3"><div>{getActionBadge(log.action)}</div><time className="text-xs text-slate-400 text-right">{new Date(log.createdAt).toLocaleString('pt-BR')}</time></div><div><strong className="text-sm text-white break-all">{log.user}</strong><p className="text-xs text-purple-300">{log.role}</p></div><p className="text-sm text-slate-300 break-words">{log.details || 'Sem informações detalhadas.'}</p><p className="text-xs font-mono text-slate-500">IP: {log.ipAddress || 'Não informado'}</p></article>)}</div>
+          <div className="hidden md:block overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-slate-950/60 border-b border-slate-800 text-[11px] font-bold uppercase tracking-wider text-slate-400">
@@ -220,7 +222,7 @@ export const AdminAuditLogs: React.FC = () => {
                 ))}
               </tbody>
             </table>
-          </div>
+          </div></>
         )}
       </div>
     </div>

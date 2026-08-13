@@ -75,6 +75,7 @@ export interface DashboardStats {
     critical: number;
     healthRate: number;
     categoriesCount: Record<string, number>;
+    monitoring: { online: number; degraded: number; unknown: number; offline: number };
   };
   visits: {
     total: number;
@@ -142,7 +143,16 @@ export const getAssets = async (filters?: { status?: string; category?: string; 
     assetTag: item.assetTag || 'N/A',
     serialNumber: item.serialNumber || 'N/A',
     hostname: item.hostname || 'N/A',
-    ipAddress: item.ipAddress || 'N/A',
+    ipAddress: item.currentIp || item.ipAddress || undefined,
+    currentIp: item.currentIp || undefined,
+    macAddress: item.macAddress || undefined,
+    monitoringEnabled: item.monitoringEnabled || false,
+    monitoringStatus: item.monitoringStatus || 'UNKNOWN',
+    latencyMs: item.latencyMs ?? undefined,
+    consecutiveFailures: item.consecutiveFailures || 0,
+    lastSeenAt: item.lastSeenAt || undefined,
+    lastCheckedAt: item.lastCheckedAt || undefined,
+    ipHistory: item.ipHistory || [],
     category: item.category,
     locationId: item.locationId,
     locationName: item.location ? item.location.name : 'Não especificado',
@@ -160,9 +170,10 @@ export const createAsset = async (data: {
   assetTag?: string;
   serialNumber?: string;
   hostname?: string;
-  ipAddress?: string;
+  macAddress?: string;
+  monitoringEnabled?: boolean;
   category: string;
-  locationId?: string;
+  locationId?: string | null;
   status?: string;
   imageUrl?: string;
   wifiBands?: string;
@@ -178,8 +189,10 @@ export const updateAsset = async (id: string, data: Partial<{
   serialNumber: string;
   hostname: string;
   ipAddress: string;
+  macAddress: string;
+  monitoringEnabled: boolean;
   category: string;
-  locationId: string;
+  locationId: string | null;
   status: string;
   imageUrl: string;
   wifiBands: string;
@@ -211,7 +224,7 @@ export const getVisits = async (filters?: { status?: string; priority?: string; 
     address: item.address,
     locationId: item.locationId,
     locationName: item.location ? item.location.name : 'Vários Locais',
-    technician: item.technician ? item.technician.name : 'Carlos Silva (Técnico)',
+    technician: item.technician ? item.technician.name : 'Não atribuído',
     date: item.scheduledDate ? new Date(item.scheduledDate).toISOString().split('T')[0] : 'N/A',
     time: item.scheduledTime || '09:00 - 12:00',
     status: item.status,
@@ -234,7 +247,7 @@ export const getVisitDetails = async (id: string): Promise<Visit> => {
     address: item.address,
     locationId: item.locationId,
     locationName: item.location ? item.location.name : 'Vários Locais',
-    technician: item.technician ? item.technician.name : 'Carlos Silva (Técnico)',
+    technician: item.technician ? item.technician.name : 'Não atribuído',
     date: item.scheduledDate ? new Date(item.scheduledDate).toISOString().split('T')[0] : 'N/A',
     time: item.scheduledTime || '09:00 - 12:00',
     status: item.status,
@@ -447,7 +460,15 @@ export const getPeripherals = async (filters?: {
     subcategory: item.subcategory as any,
     brand: item.brand || 'N/A',
     model: item.model || 'N/A',
-    ipAddress: item.ipAddress || 'N/A',
+    ipAddress: item.currentIp || item.ipAddress || undefined,
+    currentIp: item.currentIp || undefined,
+    macAddress: item.macAddress || undefined,
+    monitoringEnabled: item.monitoringEnabled || false,
+    monitoringStatus: item.monitoringStatus || 'UNKNOWN',
+    latencyMs: item.latencyMs ?? undefined,
+    consecutiveFailures: item.consecutiveFailures || 0,
+    lastSeenAt: item.lastSeenAt || undefined,
+    lastCheckedAt: item.lastCheckedAt || undefined,
     specifications: item.specifications || 'N/A',
     status: item.status,
     imageUrl: item.imageUrl,
@@ -475,7 +496,8 @@ export const createPeripheral = async (data: {
   subcategory?: string;
   brand?: string;
   model?: string;
-  ipAddress?: string;
+  macAddress?: string;
+  monitoringEnabled?: boolean;
   specifications?: string;
   status?: string;
   locationId?: string;
@@ -497,7 +519,8 @@ export const updatePeripheral = async (
     subcategory: string;
     brand: string;
     model: string;
-    ipAddress: string;
+    macAddress: string;
+    monitoringEnabled: boolean;
     specifications: string;
     status: string;
     locationId: string;
@@ -512,4 +535,3 @@ export const updatePeripheral = async (
 export const deletePeripheral = async (id: string): Promise<void> => {
   await api.delete(`/peripherals/${id}`);
 };
-

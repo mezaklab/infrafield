@@ -23,11 +23,12 @@ import {
   Monitor,
   ExternalLink
 } from 'lucide-react';
-import { Asset, Location } from '../types';
+import { Asset, LensImportDraft, Location } from '../types';
 import { getAssets, createAsset, updateAsset, deleteAsset, getLocations, downloadInventoryPDFReport, exportAssetsCSV } from '../services/api';
 import { getSocket, StatusUpdatedPayload } from '../services/socket';
 import { getLocationFullName } from '../utils/location';
 import { ExportDropdown } from '../components/Layout/ExportDropdown';
+import { getGenericAssetKind } from '../utils/assetPresentation';
 
 /**
  * Mapeamento MOCADO COM PNGs REAIS DE VERDADE com Fundo Transparente.
@@ -71,7 +72,27 @@ const FALLBACK_PHOTO_HARDWARE_DATA_URIS: Record<string, string> = {
   'SRV-VM-01': `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 80" fill="none"><rect x="4" y="8" width="192" height="64" rx="5" fill="%230a1628" stroke="%2338bdf8" stroke-width="1.5"/><rect x="2" y="6" width="4" height="68" rx="2" fill="%23172033"/><rect x="194" y="6" width="4" height="68" rx="2" fill="%23172033"/><rect x="10" y="14" width="18" height="52" rx="2" fill="%23071020" stroke="%23334155"/><rect x="32" y="14" width="18" height="52" rx="2" fill="%23071020" stroke="%23334155"/><rect x="54" y="14" width="18" height="52" rx="2" fill="%23071020" stroke="%23334155"/><text x="120" y="36" font-family="sans-serif" font-weight="900" font-size="11" fill="%2300f2fe" text-anchor="middle">DELL</text><text x="120" y="48" font-family="sans-serif" font-size="7" fill="%2394a3b8" text-anchor="middle">PowerEdge R750</text><circle cx="162" cy="30" r="3.5" fill="%2310b981"/><circle cx="175" cy="30" r="3.5" fill="%2300f2fe"/><rect x="156" y="42" width="28" height="14" rx="2" fill="%23071020" stroke="%2338bdf8" stroke-opacity="0.5"/></svg>`,
 };
 
-export const Assets: React.FC = () => {
+const genericSvg = (label: string, kind: 'wireless' | 'network' | 'security' | 'storage' | 'server' | 'device') => {
+  const symbols = {
+    wireless: '<circle cx="80" cy="60" r="22"/><path d="M45 45 Q80 10 115 45 M56 55 Q80 30 104 55 M70 66 Q80 56 90 66"/><circle cx="80" cy="74" r="3" fill="%2300f2fe"/>',
+    network: '<rect x="28" y="43" width="104" height="38" rx="8"/><g fill="%2300f2fe"><circle cx="48" cy="62" r="3"/><circle cx="62" cy="62" r="3"/><circle cx="76" cy="62" r="3"/><circle cx="90" cy="62" r="3"/></g><path d="M104 57h16v10h-16z"/>',
+    security: '<path d="M80 18 122 34v30c0 27-20 42-42 50C58 106 38 91 38 64V34z"/><path d="m64 65 11 11 23-25"/>',
+    storage: '<ellipse cx="80" cy="32" rx="42" ry="14"/><path d="M38 32v52c0 8 19 14 42 14s42-6 42-14V32 M38 58c0 8 19 14 42 14s42-6 42-14"/>',
+    server: '<rect x="38" y="18" width="84" height="92" rx="8"/><path d="M50 38h60M50 62h60M50 86h60"/><g fill="%2300f2fe"><circle cx="102" cy="30" r="3"/><circle cx="102" cy="54" r="3"/><circle cx="102" cy="78" r="3"/></g>',
+    device: '<rect x="34" y="24" width="92" height="68" rx="10"/><path d="M58 106h44M68 92v14M92 92v14"/>',
+  };
+  return `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 130" fill="none" stroke="%2300f2fe" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">${symbols[kind]}<text x="80" y="126" text-anchor="middle" font-family="sans-serif" font-size="10" font-weight="700" fill="%2394a3b8" stroke="none">${label}</text></svg>`;
+};
+
+export const getGenericCategoryImage = (category: string): string => {
+  const kind = getGenericAssetKind(category);
+  const labels = { wireless: 'ACCESS POINT', network: 'REDE', security: 'FIREWALL', storage: 'STORAGE', server: 'SERVIDOR', device: 'ATIVO' };
+  return genericSvg(labels[kind], kind);
+};
+
+interface AssetsProps { lensImport?: LensImportDraft | null; onLensImportConsumed?: () => void; }
+
+export const Assets: React.FC<AssetsProps> = ({ lensImport, onLensImportConsumed }) => {
   const [assets, setAssets] = useState<Asset[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);
   const [loading, setLoading] = useState(true);
@@ -85,6 +106,7 @@ export const Assets: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingAssetId, setEditingAssetId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
 
   // Form states for asset creation & editing (com campo imageUrl, ownershipType e rentalCompany)
   const [assetForm, setAssetForm] = useState({
@@ -96,12 +118,34 @@ export const Assets: React.FC = () => {
     serialNumber: '',
     hostname: '',
     ipAddress: '',
+    macAddress: '',
+    monitoringEnabled: true,
     category: 'Redes & Switches',
     locationId: '',
     status: 'OPERATIONAL',
     imageUrl: '',
     wifiBands: '',
   });
+
+  useEffect(() => {
+    if (!lensImport) return;
+    const type = lensImport.type.toUpperCase();
+    const category = type === 'ACCESS_POINT' ? 'Redes Sem Fio' : type === 'SERVIDOR' || type === 'STORAGE' ? 'Servidores & Storage' : type === 'FIREWALL' ? 'Segurança' : 'Redes & Switches';
+    setEditingAssetId(null);
+    setAssetForm((current) => ({
+      ...current,
+      name: [lensImport.manufacturer, lensImport.model].filter(Boolean).join(' ') || 'Ativo identificado',
+      code: `LENS-${Date.now().toString().slice(-6)}`,
+      assetTag: lensImport.assetTag,
+      serialNumber: lensImport.serviceTag || lensImport.serialNumber,
+      macAddress: lensImport.macAddress,
+      category,
+      monitoringEnabled: Boolean(lensImport.macAddress),
+      locationId: '',
+    }));
+    setIsModalOpen(true);
+    onLensImportConsumed?.();
+  }, [lensImport, onLensImportConsumed]);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -140,6 +184,11 @@ export const Assets: React.FC = () => {
             return {
               ...asset,
               status: payload.status as Asset['status'],
+              monitoringStatus: payload.monitoringStatus || asset.monitoringStatus,
+              currentIp: payload.ipAddress || asset.currentIp,
+              latencyMs: payload.latencyMs ?? asset.latencyMs,
+              consecutiveFailures: payload.monitoringStatus === 'ONLINE' ? 0 : asset.consecutiveFailures,
+              lastCheckedAt: payload.timestamp || new Date().toISOString(),
             };
           }
           return asset;
@@ -151,6 +200,10 @@ export const Assets: React.FC = () => {
           return {
             ...prevSelected,
             status: payload.status as Asset['status'],
+            monitoringStatus: payload.monitoringStatus || prevSelected.monitoringStatus,
+            currentIp: payload.ipAddress || prevSelected.currentIp,
+            latencyMs: payload.latencyMs ?? prevSelected.latencyMs,
+            lastCheckedAt: payload.timestamp || new Date().toISOString(),
           };
         }
         return prevSelected;
@@ -166,6 +219,7 @@ export const Assets: React.FC = () => {
 
   const handleOpenCreateModal = () => {
     setEditingAssetId(null);
+    setFormError(null);
     setAssetForm({
       name: '',
       code: '',
@@ -175,8 +229,10 @@ export const Assets: React.FC = () => {
       serialNumber: '',
       hostname: '',
       ipAddress: '',
+      macAddress: '',
+      monitoringEnabled: true,
       category: 'Redes & Switches',
-      locationId: locations[0]?.id || '',
+      locationId: '',
       status: 'OPERATIONAL',
       imageUrl: '',
       wifiBands: '',
@@ -186,6 +242,7 @@ export const Assets: React.FC = () => {
 
   const handleOpenEditModal = (asset: Asset) => {
     setEditingAssetId(asset.id);
+    setFormError(null);
     setAssetForm({
       name: asset.name,
       code: asset.code,
@@ -195,6 +252,8 @@ export const Assets: React.FC = () => {
       serialNumber: asset.serialNumber || '',
       hostname: asset.hostname || '',
       ipAddress: asset.ipAddress || '',
+      macAddress: asset.macAddress || '',
+      monitoringEnabled: asset.monitoringEnabled,
       category: asset.category,
       locationId: asset.locationId || '',
       status: asset.status,
@@ -221,17 +280,30 @@ export const Assets: React.FC = () => {
 
   const handleSaveAsset = async (e: React.FormEvent) => {
     e.preventDefault();
+    setFormError(null);
+    if (assetForm.locationId && !locations.some((location) => location.id === assetForm.locationId)) {
+      setAssetForm((current) => ({ ...current, locationId: '' }));
+      setFormError('A localização selecionada não existe mais. Selecione outra localização.');
+      return;
+    }
     setSubmitting(true);
     try {
+      // currentIp belongs to network discovery; the regular form never writes it.
+      const { ipAddress: _dynamicIp, ...editableFields } = assetForm;
+      const payload = { ...editableFields, locationId: assetForm.locationId || null };
       if (editingAssetId) {
-        await updateAsset(editingAssetId, assetForm);
+        await updateAsset(editingAssetId, payload);
       } else {
-        await createAsset(assetForm);
+        await createAsset(payload);
       }
       setIsModalOpen(false);
       fetchData();
     } catch (err: any) {
-      alert(err.response?.data?.error || 'Erro ao salvar ativo');
+      const message = err.response?.data?.error || 'Não foi possível salvar o ativo. Verifique os dados e tente novamente.';
+      setFormError(message);
+      if (err.response?.data?.code === 'INVALID_LOCATION') {
+        setAssetForm((current) => ({ ...current, locationId: '' }));
+      }
     } finally {
       setSubmitting(false);
     }
@@ -241,10 +313,17 @@ export const Assets: React.FC = () => {
    * Matcher Inteligente e Fallback Dinâmico DEFINITIVO para PNGs Reais de Equipamentos.
    */
   const getExactIsolatedEquipmentImage = (code: string, category: string, name: string, customUrl?: string) => {
-    // Regra 1: Se o ativo possuir imageUrl customizada informada pelo usuário, usa diretamente
+    // Foto real enviada/informada pelo usuário sempre tem prioridade.
     if (customUrl && customUrl.trim().length > 0) {
       return customUrl;
     }
+
+    // Sem foto real, a categoria confirmada é a única fonte para o placeholder.
+    // Nome, código, MAC, fabricante/OUI e descoberta de rede não classificam o ativo.
+    return getGenericCategoryImage(category);
+
+    /* Compatibilidade morta mantida temporariamente apenas para não migrar URLs históricas.
+       Nenhum destes presets é selecionado para novos cards. */
 
     const nm = (name || '').toLowerCase();
     const cat = (category || '').toLowerCase();
@@ -306,6 +385,9 @@ export const Assets: React.FC = () => {
   };
 
   const getFallbackDataURI = (_code: string, category: string, name: string) => {
+    void name;
+    return getGenericCategoryImage(category);
+    /* Fallback legado inacessível: será removido quando URLs históricas forem migradas. */
     const nm = (name || '').toLowerCase();
     const cat = (category || '').toLowerCase();
 
@@ -335,6 +417,13 @@ export const Assets: React.FC = () => {
   };
 
   const getCategoryMetrics = (asset: Asset) => {
+    if (asset.monitoringEnabled) {
+      return [
+        { label: 'Latência', value: asset.latencyMs !== undefined ? `${asset.latencyMs} ms` : 'N/A' },
+        { label: 'Falhas', value: String(asset.consecutiveFailures) },
+        { label: 'Monitoramento', value: asset.monitoringStatus },
+      ];
+    }
     const cat = (asset.category || '').toLowerCase();
     const name = (asset.name || '').toLowerCase();
 
@@ -382,6 +471,17 @@ export const Assets: React.FC = () => {
     ];
   };
 
+  const getMonitoringBadge = (asset: Asset) => {
+    if (!asset.monitoringEnabled) return getStatusBadge(asset.status);
+    const styles = {
+      ONLINE: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
+      DEGRADED: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
+      UNKNOWN: 'bg-slate-500/10 text-slate-400 border-slate-500/20',
+      OFFLINE: 'bg-rose-500/10 text-rose-400 border-rose-500/20',
+    };
+    return <span className={`ui-badge text-[11px] font-bold px-2.5 py-1 rounded-full border ${styles[asset.monitoringStatus]}`}><span className="h-1.5 w-1.5 rounded-full bg-current" aria-hidden="true" />{asset.monitoringStatus}</span>;
+  };
+
   const getStatusBadge = (status: Asset['status']) => {
     switch (status) {
       case 'OPERATIONAL':
@@ -414,7 +514,7 @@ export const Assets: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Header Actions */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-xl font-bold text-white tracking-tight flex items-center gap-2">
             <Activity className="w-5 h-5 text-[#00f2fe]" />
@@ -423,7 +523,7 @@ export const Assets: React.FC = () => {
           <p className="text-xs text-slate-400">Telemetria em tempo real, serial, hostname e portas ativas</p>
         </div>
 
-        <div className="flex items-center gap-2 flex-wrap">
+        <div className="grid grid-cols-[44px_1fr_1fr] sm:flex items-center gap-2">
           <button
             onClick={fetchData}
             className="p-2.5 bg-[#080d1a] hover:bg-slate-800 border border-slate-800 rounded-xl text-slate-400 hover:text-white"
@@ -462,7 +562,7 @@ export const Assets: React.FC = () => {
       </div>
 
       {/* Filter and Search Bar */}
-      <div className="noc-panel p-4 rounded-2xl flex flex-col md:flex-row gap-4 items-center justify-between bg-[#080d1a] border border-cyan-500/15">
+        <div className="noc-panel p-3 sm:p-4 rounded-2xl flex flex-col md:flex-row gap-3 sm:gap-4 items-center justify-between bg-[#080d1a] border border-cyan-500/15">
         <div className="relative w-full md:w-80">
           <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
           <input
@@ -474,7 +574,7 @@ export const Assets: React.FC = () => {
           />
         </div>
 
-        <div className="flex items-center gap-1.5 overflow-x-auto w-full md:w-auto pb-1 md:pb-0">
+        <div className="flex items-center gap-1.5 overflow-x-auto w-full md:w-auto pb-1 md:pb-0 snap-x">
           <span className="text-xs text-slate-400 mr-2 flex items-center gap-1 shrink-0">
             <Filter className="w-3.5 h-3.5" /> Status:
           </span>
@@ -488,7 +588,7 @@ export const Assets: React.FC = () => {
             <button
               key={tab.id}
               onClick={() => setStatusFilter(tab.id)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${
+              className={`min-h-11 px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all snap-start ${
                 statusFilter === tab.id
                   ? 'bg-[#00f2fe]/15 text-[#00f2fe] border border-[#00f2fe]/30'
                   : 'bg-[#050811] text-slate-400 hover:text-slate-200 border border-slate-800'
@@ -523,7 +623,7 @@ export const Assets: React.FC = () => {
             return (
               <div
                 key={asset.id}
-                className="bg-[#080d1a] border border-cyan-500/15 hover:border-cyan-500/40 rounded-2xl p-5 shadow-xl flex flex-col justify-between transition-all group relative overflow-hidden backdrop-blur-md"
+                className="surface-base bg-[#080d1a] border border-cyan-500/15 hover:border-cyan-500/40 rounded-2xl p-5 shadow-xl flex flex-col justify-between transition-all group relative overflow-hidden backdrop-blur-md"
               >
                 <div>
                   {/* 1. TOPO: Badge Código Ativo à esquerda + Status à direita */}
@@ -546,7 +646,7 @@ export const Assets: React.FC = () => {
                       >
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
-                      {getStatusBadge(asset.status)}
+                      {getMonitoringBadge(asset)}
                     </div>
                   </div>
 
@@ -559,9 +659,9 @@ export const Assets: React.FC = () => {
                         onError={(e) => {
                           (e.target as HTMLImageElement).src = fallbackDataURI;
                         }}
-                        className="w-full h-full object-contain bg-transparent drop-shadow-[0_0_15px_rgba(0,240,255,0.5)]"
+                        className="asset-visual w-full h-full object-contain bg-transparent drop-shadow-[0_0_15px_rgba(0,240,255,0.5)]"
                       />
-                      <div className="absolute bottom-0 w-full h-2 rounded-full bg-[#00f2fe]/40 blur-md pointer-events-none"></div>
+                      <div className="asset-visual-glow absolute bottom-0 w-full h-2 rounded-full bg-[#00f2fe]/40 blur-md pointer-events-none"></div>
                     </div>
 
                     {/* ESTRUTURA DOS TEXTOS (Lado direito da foto) */}
@@ -581,10 +681,14 @@ export const Assets: React.FC = () => {
                           <strong className="text-slate-200 font-mono">{asset.assetTag}</strong>
                         </div>
                         <div className="flex items-center justify-between text-[11px]">
-                          <span className="text-slate-500">IP / Host:</span>
-                          <span className="text-[#00f2fe] font-mono font-bold truncate drop-shadow-[0_0_8px_rgba(0,242,254,0.3)]">
-                            {asset.ipAddress || asset.hostname}
+                          <span className="text-slate-500">IP atual:</span>
+                          <span className="action-text font-mono font-bold truncate">
+                            {asset.currentIp || asset.hostname || 'Aguardando descoberta'}
                           </span>
+                        </div>
+                        <div className="flex items-center justify-between text-[11px]">
+                          <span className="text-slate-500">MAC:</span>
+                          <strong className="text-slate-200 font-mono">{asset.macAddress || 'Não cadastrado'}</strong>
                         </div>
                       </div>
                     </div>
@@ -597,7 +701,7 @@ export const Assets: React.FC = () => {
                   </div>
 
                   {/* 3. BLOCO INFERIOR: Métricas técnicas em colunas limpas */}
-                  <div className="mt-3 grid grid-cols-3 gap-1.5 p-2 bg-[#050811] rounded-xl border border-slate-800/80 text-center text-[10px]">
+                  <div className="mt-3 grid grid-cols-1 min-[360px]:grid-cols-3 gap-1.5 p-2 bg-[#050811] rounded-xl border border-slate-800/80 text-center text-[11px]">
                     {metrics.map((m, idx) => (
                       <div key={idx} className="flex flex-col">
                         <span className="text-slate-500 font-semibold">{m.label}</span>
@@ -617,7 +721,7 @@ export const Assets: React.FC = () => {
                     }
                     target="_blank"
                     rel="noreferrer"
-                    className="text-[11px] font-semibold text-[#00f2fe] bg-[#00f2fe]/10 hover:bg-[#00f2fe]/20 border border-[#00f2fe]/30 px-2.5 py-1 rounded-lg flex items-center gap-1.5 transition-all cursor-pointer"
+                    className="action-text text-[11px] font-semibold bg-[#00f2fe]/10 hover:bg-[#00f2fe]/20 border border-[#00f2fe]/30 px-2.5 py-1 rounded-lg flex items-center gap-1.5 transition-all cursor-pointer"
                     title={`Abrir Interface de Gerência (${asset.ipAddress || asset.hostname || '127.0.0.1'}) em nova aba`}
                   >
                     <Monitor className="w-3.5 h-3.5 text-[#00f2fe]" />
@@ -641,8 +745,8 @@ export const Assets: React.FC = () => {
 
       {/* Asset Details Modal */}
       {selectedAsset && (
-        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#080d1a] border border-cyan-500/20 rounded-3xl p-6 max-w-lg w-full shadow-2xl relative">
+        <div className="responsive-modal-backdrop">
+          <div className="responsive-modal-panel bg-[#080d1a] border-cyan-500/20 max-w-lg relative">
             <button
               onClick={() => setSelectedAsset(null)}
               className="absolute top-5 right-5 p-2 text-slate-400 hover:text-white rounded-xl bg-slate-800"
@@ -684,8 +788,20 @@ export const Assets: React.FC = () => {
                 <span className="text-[#00f2fe] font-mono font-bold">{selectedAsset.hostname}</span>
               </div>
               <div className="flex justify-between py-1 border-b border-slate-800">
-                <span className="text-slate-400">Endereço IP:</span>
-                <span className="text-[#00f2fe] font-mono font-bold">{selectedAsset.ipAddress}</span>
+                <span className="text-slate-400">IP atual:</span>
+                <span className="text-[#00f2fe] font-mono font-bold">{selectedAsset.currentIp || 'Aguardando descoberta'}</span>
+              </div>
+              <div className="flex justify-between py-1 border-b border-slate-800">
+                <span className="text-slate-400">MAC Address:</span>
+                <span className="text-slate-200 font-mono font-bold">{selectedAsset.macAddress || 'Não cadastrado'}</span>
+              </div>
+              <div className="flex justify-between py-1 border-b border-slate-800">
+                <span className="text-slate-400">Última verificação:</span>
+                <span className="text-slate-200">{selectedAsset.lastCheckedAt ? new Date(selectedAsset.lastCheckedAt).toLocaleString('pt-BR') : 'Ainda não verificado'}</span>
+              </div>
+              <div className="flex justify-between py-1 border-b border-slate-800">
+                <span className="text-slate-400">Última vez visto / Latência:</span>
+                <span className="text-slate-200">{selectedAsset.lastSeenAt ? new Date(selectedAsset.lastSeenAt).toLocaleString('pt-BR') : 'N/A'} · {selectedAsset.latencyMs ?? 'N/A'} ms</span>
               </div>
               {(selectedAsset.wifiBands || selectedAsset.category === 'Redes Sem Fio') && (
                 <div className="flex justify-between py-1 border-b border-slate-800 bg-amber-500/5 px-2 rounded-lg">
@@ -734,8 +850,8 @@ export const Assets: React.FC = () => {
 
       {/* Asset Creation & Editing Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#080d1a] border border-cyan-500/20 rounded-3xl p-6 max-w-md w-full shadow-2xl relative max-h-[90vh] overflow-y-auto">
+        <div className="responsive-modal-backdrop">
+          <div className="responsive-modal-panel bg-[#080d1a] border-cyan-500/20 max-w-md relative">
             <button
               onClick={() => setIsModalOpen(false)}
               className="absolute top-5 right-5 p-2 text-slate-400 hover:text-white rounded-xl bg-slate-800"
@@ -748,6 +864,12 @@ export const Assets: React.FC = () => {
             <p className="text-xs text-slate-400 mb-4">Insira ou atualize os dados técnicos do equipamento.</p>
 
             <form onSubmit={handleSaveAsset} className="space-y-3">
+              {formError && (
+                <div role="alert" aria-live="assertive" className="rounded-xl border border-rose-500/30 bg-rose-500/10 px-3 py-2.5 text-sm text-rose-200">
+                  <AlertCircle className="inline w-4 h-4 mr-2" />
+                  {formError}
+                </div>
+              )}
               <div>
                 <label className="block text-xs font-semibold text-slate-300 mb-1">Nome do Equipamento</label>
                 <input
@@ -760,7 +882,7 @@ export const Assets: React.FC = () => {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-semibold text-slate-300 mb-1">Código ID *</label>
                   <input
@@ -784,7 +906,7 @@ export const Assets: React.FC = () => {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-semibold text-slate-300 mb-1">Tipo de Patrimônio *</label>
                   <select
@@ -830,7 +952,7 @@ export const Assets: React.FC = () => {
                 </div>
               )}
 
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-semibold text-slate-300 mb-1">Categoria</label>
                   <select
@@ -876,7 +998,7 @@ export const Assets: React.FC = () => {
                 </div>
               )}
 
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-semibold text-slate-300 mb-1">Hostname</label>
                   <input
@@ -888,16 +1010,33 @@ export const Assets: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">Endereço IP</label>
-                  <input
-                    type="text"
-                    value={assetForm.ipAddress}
-                    onChange={(e) => setAssetForm({ ...assetForm, ipAddress: e.target.value })}
-                    placeholder="Ex: 192.168.1.1"
-                    className="w-full bg-[#050811] border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200"
-                  />
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">IP atual</label>
+                  <div className="min-h-9 flex items-center rounded-xl border border-slate-800 bg-[#050811]/60 px-3 py-2 text-xs text-slate-400">
+                    {editingAssetId && assetForm.ipAddress ? assetForm.ipAddress : 'Será descoberto automaticamente'}
+                  </div>
+                  <p className="mt-1 text-[10px] text-slate-500">Detectado pelo InfraField a partir do MAC Address.</p>
                 </div>
               </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-cyan-500/5 border border-cyan-500/20 rounded-xl p-3">
+                <div>
+                  <label className="block text-xs font-bold text-cyan-300 mb-1">MAC Address</label>
+                  <input
+                    type="text"
+                    value={assetForm.macAddress}
+                    onChange={(e) => setAssetForm({ ...assetForm, macAddress: e.target.value })}
+                    placeholder="00:11:22:AA:BB:CC"
+                    className="w-full bg-[#050811] border border-cyan-500/30 rounded-xl px-3 py-2 text-xs text-slate-200 font-mono"
+                  />
+                </div>
+                <label className="flex items-center gap-2 text-xs font-semibold text-slate-200 pt-5 cursor-pointer">
+                  <input type="checkbox" checked={assetForm.monitoringEnabled} onChange={(e) => setAssetForm({ ...assetForm, monitoringEnabled: e.target.checked })} />
+                  Monitoramento automático
+                </label>
+              </div>
+              <p className="text-[11px] leading-relaxed text-cyan-200/80">
+                O InfraField localizará o equipamento pelo MAC Address, descobrirá seu IP atual e verificará sua disponibilidade automaticamente.
+              </p>
 
               <div>
                 <label className="block text-xs font-semibold text-slate-300 mb-1">Número de Série (S/N)</label>
@@ -914,7 +1053,7 @@ export const Assets: React.FC = () => {
                 <label className="block text-xs font-semibold text-slate-300 mb-1">Localização</label>
                 <select
                   value={assetForm.locationId}
-                  onChange={(e) => setAssetForm({ ...assetForm, locationId: e.target.value })}
+                  onChange={(e) => { setAssetForm({ ...assetForm, locationId: e.target.value }); setFormError(null); }}
                   className="w-full bg-[#050811] border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200"
                 >
                   <option value="">Selecione um local...</option>
@@ -924,6 +1063,7 @@ export const Assets: React.FC = () => {
                     </option>
                   ))}
                 </select>
+                <p className="mt-1 text-[11px] text-slate-500">Opcional. Deixe em branco se o ativo ainda não tiver localização definida.</p>
               </div>
 
               {/* FOTO DO EQUIPAMENTO — Biblioteca Local de Assets (Enterprise) */}
@@ -932,18 +1072,14 @@ export const Assets: React.FC = () => {
                   Foto do Equipamento
                 </label>
 
-                <select
+                <input
+                  type="url"
                   value={assetForm.imageUrl}
                   onChange={(e) => setAssetForm({ ...assetForm, imageUrl: e.target.value })}
+                  placeholder="URL da foto real (opcional)"
                   className="w-full bg-[#080d1a] border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-300 focus:outline-none focus:border-[#00f2fe]"
-                >
-                  <option value="">Detecção Automática (por Nome / Categoria)</option>
-                  <option value={REAL_ISOLATED_HARDWARE_PNGS['AP-WIFI-01']}>Access Point — Aruba AP-515 / Intelbras AP</option>
-                  <option value={REAL_ISOLATED_HARDWARE_PNGS['SW-CORE-01']}>Switch de Rack — Cisco Catalyst / Intelbras SW</option>
-                  <option value={REAL_ISOLATED_HARDWARE_PNGS['FW-EDGE-01']}>Firewall — Fortinet FortiGate 100F</option>
-                  <option value={REAL_ISOLATED_HARDWARE_PNGS['SAN-STOR-01']}>Storage — Dell PowerVault ME5024</option>
-                  <option value={REAL_ISOLATED_HARDWARE_PNGS['SRV-VM-01']}>Servidor — Dell PowerEdge R750</option>
-                </select>
+                />
+                <p className="text-[11px] text-slate-500">Sem foto real, o InfraField usa uma ilustração neutra da categoria selecionada.</p>
 
                 {/* Preview ao vivo */}
                 <div className="flex items-center gap-4 pt-2 border-t border-slate-800/80">
@@ -960,7 +1096,7 @@ export const Assets: React.FC = () => {
                   </div>
                   <div className="text-[11px] text-slate-400 space-y-0.5">
                     <span className="text-[#00f2fe] font-bold block">Preview</span>
-                    <span>Imagem PNG isolada da biblioteca local.<br/>Atualiza ao trocar o modelo acima.</span>
+                    <span>{assetForm.imageUrl ? 'Foto real informada pelo usuário.' : 'Ilustração genérica baseada na categoria confirmada.'}</span>
                   </div>
                 </div>
               </div>

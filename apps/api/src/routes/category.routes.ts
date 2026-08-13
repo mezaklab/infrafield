@@ -7,11 +7,11 @@ import { requireRole } from '../middlewares/auth.middleware';
 export const categoryRouter = Router();
 
 const CreateCategorySchema = z.object({
-  name: z.string().min(1, 'Nome da categoria é obrigatório'),
+  name: z.string().trim().min(1, 'Nome da categoria é obrigatório'),
 });
 
 const UpdateCategorySchema = z.object({
-  name: z.string().min(1, 'Nome da categoria é obrigatório'),
+  name: z.string().trim().min(1, 'Nome da categoria é obrigatório'),
 });
 
 // GET /api/categories - Lista todas as categorias
@@ -45,8 +45,16 @@ categoryRouter.get('/:id', async (req: Request, res: Response) => {
 categoryRouter.post('/', requireRole([Role.SUPERADMIN, Role.ADMIN]), async (req: Request, res: Response) => {
   try {
     const { name } = CreateCategorySchema.parse(req.body);
+    const normalizedName = name.trim();
+    const duplicate = await prisma.category.findFirst({
+      where: { name: { equals: normalizedName, mode: 'insensitive' } },
+      select: { id: true },
+    });
+    if (duplicate) {
+      return res.status(409).json({ success: false, message: 'Já existe uma categoria com esse nome.' });
+    }
     const category = await prisma.category.create({
-      data: { name },
+      data: { name: normalizedName },
     });
     return res.status(201).json({ success: true, data: category });
   } catch (error: any) {
@@ -61,9 +69,20 @@ categoryRouter.post('/', requireRole([Role.SUPERADMIN, Role.ADMIN]), async (req:
 categoryRouter.put('/:id', requireRole([Role.SUPERADMIN, Role.ADMIN]), async (req: Request, res: Response) => {
   try {
     const { name } = UpdateCategorySchema.parse(req.body);
+    const normalizedName = name.trim();
+    const duplicate = await prisma.category.findFirst({
+      where: {
+        name: { equals: normalizedName, mode: 'insensitive' },
+        NOT: { id: req.params.id },
+      },
+      select: { id: true },
+    });
+    if (duplicate) {
+      return res.status(409).json({ success: false, message: 'Já existe uma categoria com esse nome.' });
+    }
     const category = await prisma.category.update({
       where: { id: req.params.id },
-      data: { name },
+      data: { name: normalizedName },
     });
     return res.json({ success: true, data: category });
   } catch (error: any) {
@@ -77,6 +96,10 @@ categoryRouter.put('/:id', requireRole([Role.SUPERADMIN, Role.ADMIN]), async (re
 // DELETE /api/categories/:id - Remove categoria
 categoryRouter.delete('/:id', requireRole([Role.SUPERADMIN, Role.ADMIN]), async (req: Request, res: Response) => {
   try {
+    const linkedTickets = await (prisma.ticket as any).count({ where: { categoryId: req.params.id } });
+    if (linkedTickets > 0) {
+      return res.status(409).json({ success: false, message: 'Não é possível excluir uma categoria associada a chamados existentes.' });
+    }
     await prisma.category.delete({
       where: { id: req.params.id },
     });

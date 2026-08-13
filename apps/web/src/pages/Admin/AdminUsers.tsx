@@ -17,7 +17,7 @@ import {
   User,
 } from 'lucide-react';
 import { api } from '../../services/api';
-import { SystemUser, Location } from '../../types';
+import { SystemUser, Location, AccessRole } from '../../types';
 import { useAuth } from '../../contexts/AuthContext';
 import { getLocationFullName } from '../../utils/location';
 
@@ -25,6 +25,7 @@ export const AdminUsers: React.FC = () => {
   const { user: currentUser } = useAuth();
   const [users, setUsers] = useState<SystemUser[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);
+  const [accessRoles, setAccessRoles] = useState<AccessRole[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [search, setSearch] = useState<string>('');
   const [roleFilter, setRoleFilter] = useState<string>('ALL');
@@ -39,6 +40,8 @@ export const AdminUsers: React.FC = () => {
     password: '',
     role: 'SUPERADMIN' as 'SUPERADMIN' | 'ADMIN' | 'MANAGER' | 'TECHNICIAN' | 'VIEWER' | 'USUARIO',
     locationId: '',
+    accessRoleId: '',
+    isActive: true,
   });
   const [formError, setFormError] = useState<string | null>(null);
   const [formSuccess, setFormSuccess] = useState<string | null>(null);
@@ -47,53 +50,17 @@ export const AdminUsers: React.FC = () => {
   const fetchUsersAndLocations = async () => {
     try {
       setLoading(true);
-      const [usersRes, locsRes] = await Promise.all([
+      const [usersRes, locsRes, rolesRes] = await Promise.all([
         api.get<SystemUser[]>('/admin/users'),
         api.get<Location[]>('/locations').catch(() => ({ data: [] })),
+        api.get<AccessRole[]>('/admin/roles'),
       ]);
       setUsers(usersRes.data);
       setLocations(locsRes.data || []);
+      setAccessRoles(rolesRes.data || []);
     } catch (err: any) {
       console.warn('Fallback backend users list:', err);
-      // Fallback data if backend database is empty or offline
-      setUsers([
-        {
-          id: 'usr-1',
-          name: 'SuperAdministrador InfraField',
-          email: 'superadmin@infrafield.io',
-          role: 'SUPERADMIN',
-          companyId: 'comp-1',
-          company: { id: 'comp-1', name: 'TechCorp Infraestrutura S.A.' },
-          createdAt: new Date().toISOString(),
-        },
-        {
-          id: 'usr-2',
-          name: 'Administrador InfraField',
-          email: 'admin@infrafield.io',
-          role: 'ADMIN',
-          companyId: 'comp-1',
-          company: { id: 'comp-1', name: 'TechCorp Infraestrutura S.A.' },
-          createdAt: new Date().toISOString(),
-        },
-        {
-          id: 'usr-3',
-          name: 'Carlos Silva (Técnico)',
-          email: 'carlos.silva@infrafield.io',
-          role: 'TECHNICIAN',
-          companyId: 'comp-1',
-          company: { id: 'comp-1', name: 'TechCorp Infraestrutura S.A.' },
-          createdAt: new Date().toISOString(),
-        },
-        {
-          id: 'usr-4',
-          name: 'João Pedro (Usuário)',
-          email: 'joao.pedro@infrafield.io',
-          role: 'USUARIO',
-          companyId: 'comp-1',
-          company: { id: 'comp-1', name: 'TechCorp Infraestrutura S.A.' },
-          createdAt: new Date().toISOString(),
-        },
-      ]);
+      setUsers([]);
     } finally {
       setLoading(false);
     }
@@ -115,6 +82,8 @@ export const AdminUsers: React.FC = () => {
         password: '',
         role: userToEdit.role,
         locationId: userToEdit.locationId || '',
+        accessRoleId: userToEdit.accessRoleId || '',
+        isActive: userToEdit.isActive !== false,
       });
     } else {
       setEditingUser(null);
@@ -125,6 +94,8 @@ export const AdminUsers: React.FC = () => {
         password: '',
         role: 'USUARIO',
         locationId: '',
+        accessRoleId: accessRoles.find((role) => role.key === 'TECHNICIAN')?.id || '',
+        isActive: true,
       });
     }
     setIsModalOpen(true);
@@ -151,10 +122,28 @@ export const AdminUsers: React.FC = () => {
 
     try {
       setIsSubmitting(true);
-      const payload = {
-        ...formData,
-        locationId: formData.locationId || null,
-      };
+      const payload: Record<string, unknown> = editingUser
+        ? { name: formData.name, email: formData.email }
+        : { ...formData, locationId: formData.locationId || null };
+
+      if (formData.password.trim()) payload.password = formData.password;
+
+      if (!editingUser) {
+        payload.role = formData.role;
+        payload.accessRoleId = formData.accessRoleId || null;
+        payload.isActive = formData.isActive;
+      } else {
+        // Send only fields intentionally changed; an empty optional field is
+        // never sent as an invalid UUID or password.
+        if (formData.role !== editingUser.role) payload.role = formData.role;
+        if ((formData.accessRoleId || '') !== (editingUser.accessRoleId || '')) {
+          payload.accessRoleId = formData.accessRoleId || null;
+        }
+        if ((formData.locationId || '') !== (editingUser.locationId || '')) {
+          payload.locationId = formData.locationId || null;
+        }
+        if (formData.isActive !== (editingUser.isActive !== false)) payload.isActive = formData.isActive;
+      }
 
       if (editingUser) {
         await api.put(`/admin/users/${editingUser.id}`, payload);
@@ -172,7 +161,11 @@ export const AdminUsers: React.FC = () => {
         }, 1000);
       }
     } catch (err: any) {
-      const errMsg = err.response?.data?.error || 'Erro ao salvar usuário.';
+      const details = err.response?.data?.details;
+      const detailMessage = details && Object.values(details as Record<string, { _errors?: string[] }> )
+        .flatMap((item) => item?._errors || [])
+        .find(Boolean);
+      const errMsg = detailMessage || err.response?.data?.error || 'Erro ao salvar usuário.';
       setFormError(errMsg);
     } finally {
       setIsSubmitting(false);
@@ -204,39 +197,39 @@ export const AdminUsers: React.FC = () => {
     switch (role) {
       case 'SUPERADMIN':
         return (
-          <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40 flex items-center gap-1 w-fit">
+          <span className="ui-badge admin-role-badge role-superadmin px-2.5 py-1 rounded-full text-xs font-bold w-fit">
             <ShieldAlert className="w-3 h-3 text-amber-400" />
             SUPERADMIN
           </span>
         );
       case 'ADMIN':
         return (
-          <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-purple-500/20 text-purple-300 border border-purple-500/40 flex items-center gap-1 w-fit">
+          <span className="ui-badge admin-role-badge role-admin px-2.5 py-1 rounded-full text-xs font-bold w-fit">
             <ShieldCheck className="w-3 h-3 text-purple-400" />
             ADMIN
           </span>
         );
       case 'MANAGER':
         return (
-          <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 w-fit">
+          <span className="ui-badge admin-role-badge role-manager px-2.5 py-1 rounded-full text-xs font-bold w-fit">
             MANAGER
           </span>
         );
       case 'TECHNICIAN':
         return (
-          <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-blue-500/20 text-blue-300 border border-blue-500/40 w-fit">
+          <span className="ui-badge admin-role-badge role-technician px-2.5 py-1 rounded-full text-xs font-bold w-fit">
             TECHNICIAN
           </span>
         );
       case 'USUARIO':
         return (
-          <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 w-fit">
+          <span className="ui-badge admin-role-badge role-user px-2.5 py-1 rounded-full text-xs font-bold w-fit">
             USUÁRIO
           </span>
         );
       default:
         return (
-          <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-slate-500/20 text-slate-300 border border-slate-500/40 w-fit">
+          <span className="ui-badge admin-role-badge role-viewer px-2.5 py-1 rounded-full text-xs font-bold w-fit">
             VIEWER
           </span>
         );
@@ -244,22 +237,22 @@ export const AdminUsers: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="admin-data-page space-y-5">
       {/* Action Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-900/80 border border-purple-900/40 rounded-2xl p-5 shadow-lg">
+      <div className="admin-page-hero surface-ambient flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-2xl p-4 sm:p-5">
         <div className="flex items-center gap-3">
-          <div className="p-3 rounded-xl bg-purple-500/10 text-purple-400 border border-purple-500/30">
+          <div className="admin-icon-box icon-box h-11 w-11 rounded-xl">
             <Users className="w-6 h-6" />
           </div>
           <div>
-            <h2 className="text-lg font-bold text-white">Controle de Usuários & RBAC</h2>
-            <p className="text-xs text-slate-400">Total de {filteredUsers.length} usuário(s) localizado(s)</p>
+            <h2 className="if-text text-lg font-bold">Controle de Usuários & RBAC</h2>
+            <p className="if-text-secondary text-xs">Total de {filteredUsers.length} usuário(s) localizado(s)</p>
           </div>
         </div>
 
         <button
           onClick={() => handleOpenModal()}
-          className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold text-xs transition-all shadow-lg shadow-purple-600/30"
+          className="admin-button-primary min-h-10 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs"
         >
           <UserPlus className="w-4 h-4" />
           <span>Novo Usuário ADM / Técnico</span>
@@ -267,22 +260,22 @@ export const AdminUsers: React.FC = () => {
       </div>
 
       {/* Filter & Search Controls */}
-      <div className="flex flex-col md:flex-row gap-3">
+      <div className="admin-toolbar surface-elevated flex flex-col md:flex-row gap-3 rounded-2xl p-3">
         <div className="relative flex-1">
-          <Search className="w-4 h-4 absolute left-3.5 top-3.5 text-slate-400" />
+          <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 if-text-muted pointer-events-none" />
           <input
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Buscar por nome ou e-mail..."
-            className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-white text-sm focus:outline-none focus:border-purple-500 transition-colors"
+            className="admin-control min-h-11 w-full pl-10 pr-4 py-2.5 rounded-xl text-sm"
           />
         </div>
 
         <select
           value={roleFilter}
           onChange={(e) => setRoleFilter(e.target.value)}
-          className="px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-slate-200 text-sm font-semibold focus:outline-none focus:border-purple-500"
+          className="admin-control min-h-11 px-4 py-2.5 rounded-xl text-sm font-semibold md:min-w-60"
         >
           <option value="ALL">Todos os Perfis (RBAC)</option>
           <option value="SUPERADMIN">SUPERADMIN</option>
@@ -295,21 +288,30 @@ export const AdminUsers: React.FC = () => {
       </div>
 
       {/* Users Table */}
-      <div className="bg-slate-900/80 border border-purple-900/40 rounded-2xl overflow-hidden shadow-xl">
+      <div className="admin-data-panel rounded-2xl overflow-hidden">
         {loading ? (
           <div className="p-12 text-center text-purple-400 flex items-center justify-center gap-2">
             <RefreshCw className="w-6 h-6 animate-spin" />
             <span>Carregando usuários...</span>
           </div>
         ) : filteredUsers.length === 0 ? (
-          <div className="p-12 text-center text-slate-400">
-            Nenhum usuário encontrado para os filtros selecionados.
+          <div className="admin-empty-state m-4 sm:m-6">
+            <Users className="h-5 w-5" aria-hidden="true" />
+            <span>Nenhum usuário encontrado para os filtros selecionados.</span>
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <>
+          <div className="md:hidden p-3 space-y-3">
+            {filteredUsers.map((usr) => <article key={usr.id} className="mobile-data-card admin-mobile-card space-y-3">
+              <div className="flex items-start justify-between gap-3"><div className="min-w-0"><h3 className="font-bold text-white break-words">{usr.name}</h3><p className="text-sm text-slate-400 font-mono break-all">{usr.email}</p></div>{getRoleBadge(usr.role)}</div>
+              <dl className="grid grid-cols-2 gap-3 text-xs"><div><dt className="text-slate-500">Cargo</dt><dd className="text-slate-200">{usr.accessRole?.name || 'Perfil legado'}</dd></div><div><dt className="text-slate-500">Status</dt><dd className={usr.isActive === false ? 'text-rose-400' : 'text-emerald-400'}>{usr.isActive === false ? 'Inativo' : 'Ativo'}</dd></div><div><dt className="text-slate-500">Local</dt><dd className="text-slate-200 break-words">{usr.location?.name || 'Não vinculado'}</dd></div><div><dt className="text-slate-500">Criado em</dt><dd className="text-slate-200">{new Date(usr.createdAt).toLocaleDateString('pt-BR')}</dd></div></dl>
+              <div className="flex gap-2 pt-1"><button onClick={() => handleOpenModal(usr)} className="admin-button-secondary min-h-11 flex-1 rounded-xl inline-flex items-center justify-center gap-2"><Edit3 className="w-4 h-4" />Editar</button><button onClick={() => handleDeleteUser(usr.id, usr.email)} disabled={usr.id === currentUser?.id} className="admin-icon-button is-danger h-11 w-11 rounded-xl disabled:opacity-30" aria-label={`Excluir ${usr.name}`}><Trash2 className="w-4 h-4" /></button></div>
+            </article>)}
+          </div>
+          <div className="hidden md:block overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="bg-slate-950/60 border-b border-slate-800 text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                <tr className="admin-table-head text-[11px] font-bold tracking-wide">
                   <th className="px-6 py-4">Usuário / E-mail</th>
                   <th className="px-6 py-4">Perfil RBAC</th>
                   <th className="px-6 py-4">Setor / Localidade</th>
@@ -318,12 +320,12 @@ export const AdminUsers: React.FC = () => {
                   <th className="px-6 py-4 text-right">Ações</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-800/60 text-sm">
+              <tbody className="admin-table-body text-sm">
                 {filteredUsers.map((usr) => (
-                  <tr key={usr.id} className="hover:bg-slate-800/40 transition-colors">
+                  <tr key={usr.id} className="admin-table-row">
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
-                        <div className={`w-9 h-9 rounded-xl flex items-center justify-center font-bold text-xs ${
+                        <div className={`icon-box h-9 w-9 rounded-xl font-bold text-xs ${
                           usr.role === 'SUPERADMIN' 
                             ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' 
                             : usr.role === 'USUARIO'
@@ -333,25 +335,26 @@ export const AdminUsers: React.FC = () => {
                           {usr.name.slice(0, 2).toUpperCase()}
                         </div>
                         <div>
-                          <div className="font-bold text-white">{usr.name}</div>
-                          <div className="text-xs text-slate-400 font-mono">{usr.email}</div>
+                          <div className="if-text font-bold">{usr.name}</div>
+                          <div className="if-text-secondary text-xs font-mono">{usr.email}</div>
                         </div>
                       </div>
                     </td>
 
                     <td className="px-6 py-4">
                       {getRoleBadge(usr.role)}
+                      <div className="text-[10px] text-slate-500 mt-1">{usr.accessRole?.name || 'Perfil legado'} · {usr.isActive === false ? 'Inativo' : 'Ativo'}</div>
                     </td>
 
-                    <td className="px-6 py-4 text-xs font-semibold text-cyan-300">
+                    <td className="px-6 py-4 text-xs font-semibold if-text-secondary">
                       {usr.location?.name || 'Não Vinculado'}
                     </td>
 
-                    <td className="px-6 py-4 text-slate-300 text-xs">
-                      {usr.company?.name || 'TechCorp Infraestrutura'}
+                    <td className="px-6 py-4 if-text-secondary text-xs">
+                      {usr.company?.name || 'Não informada'}
                     </td>
 
-                    <td className="px-6 py-4 text-slate-400 text-xs font-mono">
+                    <td className="px-6 py-4 if-text-muted text-xs font-mono tabular-nums">
                       {new Date(usr.createdAt).toLocaleDateString('pt-BR')}
                     </td>
 
@@ -360,7 +363,8 @@ export const AdminUsers: React.FC = () => {
                         <button
                           onClick={() => handleOpenModal(usr)}
                           title="Editar Usuário / Perfil"
-                          className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors"
+                          className="admin-icon-button h-9 w-9 rounded-lg"
+                          aria-label={`Editar ${usr.name}`}
                         >
                           <Edit3 className="w-4 h-4" />
                         </button>
@@ -368,11 +372,12 @@ export const AdminUsers: React.FC = () => {
                           onClick={() => handleDeleteUser(usr.id, usr.email)}
                           disabled={usr.id === currentUser?.id}
                           title={usr.id === currentUser?.id ? 'Você não pode excluir sua própria conta' : 'Excluir Usuário'}
-                          className={`p-2 rounded-lg transition-colors ${
+                          className={`admin-icon-button h-9 w-9 rounded-lg ${
                             usr.id === currentUser?.id
-                              ? 'text-slate-600 cursor-not-allowed'
-                              : 'bg-rose-950/40 hover:bg-rose-900/60 text-rose-300 border border-rose-500/30'
+                              ? 'is-disabled cursor-not-allowed'
+                              : 'is-danger'
                           }`}
+                          aria-label={`Excluir ${usr.name}`}
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
@@ -382,14 +387,14 @@ export const AdminUsers: React.FC = () => {
                 ))}
               </tbody>
             </table>
-          </div>
+          </div></>
         )}
       </div>
 
       {/* Create / Edit User Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-purple-500/40 rounded-3xl max-w-md w-full p-6 space-y-5 shadow-2xl animate-in fade-in">
+        <div className="responsive-modal-backdrop">
+          <div className="responsive-modal-panel max-w-md space-y-5 animate-in fade-in">
             <div className="flex items-center justify-between pb-3 border-b border-slate-800">
               <div className="flex items-center gap-2.5">
                 <ShieldCheck className="w-6 h-6 text-purple-400" />
@@ -443,11 +448,11 @@ export const AdminUsers: React.FC = () => {
                     title="Use o formato nome.sobrenome, apenas letras minúsculas e ponto."
                     value={formData.username}
                     onChange={(e) => setFormData({ ...formData, username: e.target.value })}
-                    placeholder="Digite seu usuário, ex: mezak.filho"
+                    placeholder="Digite seu usuário, ex: nome.sobrenome"
                     className="w-full pl-9 pr-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white text-sm focus:outline-none focus:border-purple-500 font-mono"
                   />
                 </div>
-                <label className="text-xs font-semibold text-slate-300">E-mail Corporativo</label>
+                <label className="text-xs font-semibold text-slate-300">E-mail</label>
                 <div className="relative">
                   <Mail className="w-4 h-4 absolute left-3 top-3 text-slate-500" />
                   <input
@@ -455,7 +460,7 @@ export const AdminUsers: React.FC = () => {
                     required
                     value={formData.email}
                     onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                    placeholder="exemplo@infrafield.io"
+                    placeholder="usuario@empresa.com.br"
                     className="w-full pl-9 pr-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white text-sm focus:outline-none focus:border-purple-500 font-mono"
                   />
                 </div>
@@ -471,27 +476,27 @@ export const AdminUsers: React.FC = () => {
                     type="password"
                     value={formData.password}
                     onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                    placeholder={editingUser ? 'Manter senha atual' : 'Mínimo 6 caracteres'}
+                    placeholder={editingUser ? 'Manter senha atual' : 'Mínimo 8 caracteres'}
                     className="w-full pl-9 pr-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white text-sm focus:outline-none focus:border-purple-500"
                   />
                 </div>
               </div>
 
               <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-300">Perfil de Permissão (RBAC)</label>
+                <label className="text-xs font-semibold text-slate-300">Cargo / Perfil de Permissão (RBAC)</label>
                 <select
-                  value={formData.role}
-                  onChange={(e) => setFormData({ ...formData, role: e.target.value as any })}
+                  value={formData.accessRoleId}
+                  onChange={(e) => setFormData({ ...formData, accessRoleId: e.target.value })}
                   className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white text-sm font-semibold focus:outline-none focus:border-purple-500"
                 >
-                  <option value="USUARIO">USUÁRIO — Abertura e Acompanhamento de Chamados</option>
-                  <option value="TECHNICIAN">TECHNICIAN — Técnico de Campo / Atendimento</option>
-                  <option value="MANAGER">MANAGER — Gestor de Operações e Visitas</option>
-                  <option value="ADMIN">ADMIN — Acesso Backoffice e Gestão</option>
-                  <option value="SUPERADMIN">SUPERADMIN — Acesso Total e Edição Global</option>
-                  <option value="VIEWER">VIEWER — Apenas Leitura e Auditoria</option>
+                  <option value="">Selecione um cargo</option>
+                  {accessRoles.filter((role) => role.enabled).map((role) => <option key={role.id} value={role.id}>{role.name}</option>)}
                 </select>
               </div>
+
+              <label className="flex items-center gap-2 text-xs font-semibold text-slate-300">
+                <input type="checkbox" checked={formData.isActive} onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })} /> Usuário ativo
+              </label>
 
               <div className="space-y-1">
                 <label className="text-xs font-semibold text-slate-300">Setor / Localidade Vinculada</label>

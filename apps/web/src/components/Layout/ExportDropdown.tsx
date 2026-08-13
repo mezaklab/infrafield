@@ -87,7 +87,7 @@ export const ExportDropdown: React.FC<ExportDropdownProps> = ({
 
       {isOpen && (
         <div
-          className={`absolute ${align === 'left' ? 'left-0' : 'right-0'} top-full mt-2 w-64 bg-[#080d1a] border border-slate-700 rounded-2xl shadow-2xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-2`}
+          className={`fixed left-3 right-3 bottom-[calc(5rem+env(safe-area-inset-bottom))] sm:absolute sm:left-auto ${align === 'left' ? 'sm:left-0' : 'sm:right-0'} sm:bottom-auto sm:top-full sm:mt-2 sm:w-64 bg-[#080d1a] border border-slate-700 rounded-2xl shadow-2xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-2`}
         >
           <div className="px-3.5 py-2 border-b border-slate-800 bg-[#050811]">
             <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Opções de Exportação</p>

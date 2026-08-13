@@ -349,7 +349,7 @@ export const Tickets: React.FC<TicketsProps> = ({ isCreateOpen = false, onCloseC
       )}
 
       {/* Filters Bar */}
-      <div className="bg-[#080d1a] border border-cyan-500/15 rounded-2xl p-4 shadow-xl flex flex-col lg:flex-row gap-3">
+      <div className="surface-elevated bg-[#080d1a] border border-cyan-500/15 rounded-2xl p-4 shadow-xl flex flex-col lg:flex-row gap-3">
         <div className="relative flex-1">
           <Search className="w-4 h-4 absolute left-3.5 top-3.5 text-slate-400" />
           <input
@@ -450,7 +450,14 @@ export const Tickets: React.FC<TicketsProps> = ({ isCreateOpen = false, onCloseC
             </p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <>
+          <div className="md:hidden p-3 space-y-3">{tickets.map((tk) => <button key={tk.id} onClick={() => setSelectedTicketId(tk.id)} className="mobile-data-card w-full text-left space-y-3 active:border-cyan-500/40">
+            <div className="flex items-start justify-between gap-3"><div className="min-w-0"><span className="font-mono font-black text-cyan-300">{tk.code}</span><h3 className="font-bold text-white break-words mt-1">{tk.subject}</h3></div>{getStatusBadge(tk.status)}</div>
+            <p className="text-sm text-slate-400 line-clamp-2">{tk.description}</p>
+            <div className="grid grid-cols-2 gap-3 text-xs"><div><span className="block text-slate-500">Prioridade</span>{getPriorityBadge(tk.priority)}</div><div><span className="block text-slate-500">Setor</span><span className="text-slate-200 break-words">{tk.sector?.name || tk.location?.name || 'Não especificado'}</span></div><div className="col-span-2"><span className="block text-slate-500">Técnico</span><span className="text-slate-200">{tk.assignedTo?.name || 'Não atribuído'}</span></div></div>
+            <span className="min-h-11 w-full rounded-xl bg-cyan-500/10 border border-cyan-500/20 text-cyan-300 flex items-center justify-center gap-2 font-bold"><MessageSquare className="w-4 h-4" />Abrir atendimento</span>
+          </button>)}</div>
+          <div className="hidden md:block overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-slate-950/80 border-b border-slate-800/80 text-[11px] font-bold uppercase tracking-wider text-slate-400">
@@ -502,7 +509,7 @@ export const Tickets: React.FC<TicketsProps> = ({ isCreateOpen = false, onCloseC
 
                     {!isFinalUser && (
                       <td className="px-6 py-4 text-cyan-300 font-medium">
-                        {tk.location?.name || 'Não Especificado'}
+                        {tk.sector?.name || tk.location?.name || 'Não Especificado'}
                       </td>
                     )}
 
@@ -550,7 +557,7 @@ export const Tickets: React.FC<TicketsProps> = ({ isCreateOpen = false, onCloseC
                 ))}
               </tbody>
             </table>
-          </div>
+          </div></>
         )}
       </div>
 
