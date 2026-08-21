@@ -335,7 +335,7 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({
             if (isVideo) {
               return (
                 <div key={idx} className="rounded-xl border border-slate-700/80 overflow-hidden max-w-[280px]">
-                  <video src={url} controls className="w-full h-32 object-cover bg-black" />
+                  <video src={url} controls className="w-full h-32 object-cover bg-slate-950" />
                 </div>
               );
             }

@@ -1,12 +1,10 @@
 import http from 'http';
-import dotenv from 'dotenv';
+import './config/env';
 import { createApp } from './app';
 import { startNetworkPoller, stopNetworkPoller } from './services/networkPoller.service';
 import { initWebSocketServer } from './services/websocket.service';
 import { prisma } from './lib/prisma';
 import { createNetworkMonitoringScheduler } from './modules/network';
-
-dotenv.config();
 
 const PORT = process.env.PORT || 3333;
 const app = createApp();

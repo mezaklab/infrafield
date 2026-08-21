@@ -12,6 +12,15 @@ export async function ensureRbacBootstrap(): Promise<void> {
     permissionIds.set(key, permission.id);
   }
 
+  // Migrate legacy TECHNICIAN to TECNICO to avoid duplicates
+  const oldTech = await prisma.accessRole.findUnique({ where: { key: 'TECHNICIAN' } });
+  if (oldTech) {
+    await prisma.accessRole.update({
+      where: { key: 'TECHNICIAN' },
+      data: { key: 'TECNICO' }
+    });
+  }
+
   for (const definition of DEFAULT_ACCESS_ROLES) {
     const role = await prisma.accessRole.upsert({
       where: { key: definition.key },

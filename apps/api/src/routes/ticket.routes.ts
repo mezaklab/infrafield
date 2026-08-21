@@ -21,7 +21,7 @@ const CreateTicketSchema = z.object({
   categoryId: z.string().uuid('Categoria inválida'),
   sectorId: z.string().uuid('Setor inválido'),
   // Kept for backwards compatibility with existing clients and old tickets.
-  locationId: z.string().uuid('Localização inválida'),
+  locationId: z.string().uuid('Localização inválida').optional().nullable(),
   assetId: z.string().uuid('Ativo inválido').optional().nullable(),
   priority: z.nativeEnum(TicketPriority).optional().default(TicketPriority.MEDIA),
   attachments: z.array(z.string().max(500)).max(10).optional(),

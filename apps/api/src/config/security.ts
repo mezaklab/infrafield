@@ -1,4 +1,4 @@
-import 'dotenv/config';
+import './env';
 import crypto from 'crypto';
 
 const isProduction = process.env.NODE_ENV === 'production';

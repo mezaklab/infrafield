@@ -80,13 +80,11 @@ export const useOnlineStatus = () => {
 
     const handleOnline = async () => {
       setIsOnline(true);
-      console.log('🌐 Conexão reestabelecida! Iniciando batch sync Dexie.js -> POST /api/sync/batch');
       setIsSyncing(true);
       const synced = await syncDexieBatchQueue();
       setIsSyncing(false);
       await updatePendingCount();
       if (synced > 0) {
-        console.log(`✅ ${synced} itens offline sincronizados com o backend.`);
       }
     };
 

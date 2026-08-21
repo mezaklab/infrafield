@@ -1,4 +1,4 @@
-import 'dotenv/config';
+import '../config/env';
 import nodemailer from 'nodemailer';
 
 const isProduction = process.env.NODE_ENV === 'production';

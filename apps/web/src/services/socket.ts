@@ -32,7 +32,6 @@ export const getSocket = (): Socket => {
     });
 
     socket.on('connect', () => {
-      console.log('⚡ [WebSocket Client] Conectado com sucesso ao servidor NOC em tempo real. ID:', socket?.id);
     });
 
     socket.on('disconnect', (reason) => {

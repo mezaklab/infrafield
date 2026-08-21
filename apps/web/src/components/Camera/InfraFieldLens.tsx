@@ -131,7 +131,7 @@ export const InfraFieldLens: React.FC<Props> = ({ isOpen, onClose, onImport }) =
         <header className="flex gap-3 pr-12 mb-4"><span className="p-3 rounded-2xl bg-cyan-500/10 text-cyan-400 border border-cyan-500/20"><ScanSearch /></span><div><h2 className="text-lg font-black text-white">InfraField Lens</h2><p className="text-sm text-slate-400">Identificar ativo com foto, OCR e códigos</p></div></header>
 
         {stage === 'capture' && <>
-          <div className="relative aspect-[4/3] w-full overflow-hidden rounded-2xl bg-black border border-slate-700">
+          <div className="relative aspect-[4/3] w-full overflow-hidden rounded-2xl bg-slate-950 border border-slate-700">
             <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
             <div className="absolute inset-5 border border-cyan-400/50 rounded-xl pointer-events-none" />
             {cameraError && <div className="absolute inset-0 grid place-content-center text-center p-8 bg-slate-950/90 text-amber-300"><Camera className="mx-auto mb-3" />{cameraError}</div>}
@@ -143,7 +143,7 @@ export const InfraFieldLens: React.FC<Props> = ({ isOpen, onClose, onImport }) =
 
         {stage === 'labelCapture' && <>
           <div className="rounded-xl border border-cyan-500/30 bg-cyan-500/10 p-4 mb-4"><h3 className="font-bold text-cyan-200">Fotografe a etiqueta</h3><p className="text-sm text-slate-300 mt-1">Aproxime a câmera até que os textos estejam legíveis.</p><p className="text-xs text-slate-400 mt-2">Procure enquadrar: Modelo · Serial · Product Number · MAC</p></div>
-          <div className="relative aspect-[4/3] w-full overflow-hidden rounded-2xl bg-black border border-cyan-500/40">
+          <div className="relative aspect-[4/3] w-full overflow-hidden rounded-2xl bg-slate-950 border border-cyan-500/40">
             <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
             <div className="absolute inset-x-5 top-1/4 bottom-1/4 border-2 border-cyan-300/70 rounded-lg pointer-events-none" />
             {cameraError && <div className="absolute inset-0 grid place-content-center text-center p-8 bg-slate-950/90 text-amber-300">{cameraError}</div>}
@@ -155,7 +155,7 @@ export const InfraFieldLens: React.FC<Props> = ({ isOpen, onClose, onImport }) =
         {stage === 'analyzing' && <div className="min-h-80 grid place-content-center text-center"><Sparkles className="w-12 h-12 mx-auto text-cyan-400 animate-pulse" /><h3 className="mt-4 text-lg font-bold text-white">Analisando ativo...</h3><p className="text-sm text-slate-400 mt-2">Lendo etiqueta e verificando códigos presentes na imagem.</p></div>}
 
         {stage === 'result' && <div className="space-y-4">
-          {preview && <img src={preview} alt="Foto analisada" className="w-full max-h-56 object-contain rounded-2xl bg-black" />}
+          {preview && <img src={preview} alt="Foto analisada" className="w-full max-h-56 object-contain rounded-2xl bg-slate-950" />}
           {error && <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-200"><AlertTriangle className="inline w-4 h-4 mr-2" />{error} Você ainda pode preencher os dados e importar manualmente.</div>}
           <div className="flex items-center justify-between"><h3 className="font-bold text-white">Conferir identificação</h3><span className="text-xs text-cyan-300">Confiança {Math.round(confidence * 100)}%</span></div>
           <div className="grid sm:grid-cols-2 gap-3">

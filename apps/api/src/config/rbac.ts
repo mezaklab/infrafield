@@ -33,7 +33,7 @@ export const DEFAULT_ACCESS_ROLES = [
   { key: 'SUPERADMIN', name: 'Super Admin', description: 'Acesso irrestrito e administração completa.', protected: true, legacyRole: Role.SUPERADMIN },
   { key: 'ADMIN', name: 'Administrador', description: 'Gestão administrativa e operacional.', protected: true, legacyRole: Role.ADMIN },
   { key: 'MANAGER', name: 'Gestor', description: 'Gestão operacional de equipes e serviços.', protected: true, legacyRole: Role.MANAGER },
-  { key: 'TECHNICIAN', name: 'Técnico de Campo', description: 'Execução de atividades técnicas e ordens atribuídas.', protected: true, legacyRole: Role.TECHNICIAN },
+  { key: 'TECNICO', name: 'Técnico', description: 'Execução de atividades técnicas e ordens atribuídas.', protected: true, legacyRole: Role.TECHNICIAN },
   { key: 'VIEWER', name: 'Visualizador', description: 'Consulta sem alterações administrativas.', protected: true, legacyRole: Role.VIEWER },
   { key: 'USUARIO', name: 'Usuário', description: 'Abertura e acompanhamento de solicitações.', protected: true, legacyRole: Role.USUARIO },
 ] as const;

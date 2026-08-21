@@ -120,8 +120,16 @@ html, body, #root { transition: background-color 200ms ease, color 200ms ease; }
    the semantic dashboard classes below; this keeps every legacy route usable
    in light mode without touching business components. */
 html.light .bg-slate-950, html.light .bg-slate-950\/90, html.light .bg-slate-950\/95,
-html.light .bg-slate-950\/80, html.light [class*="bg-[#050811]"], html.light [class*="bg-[#080d1a]"] {
+html.light .bg-slate-950\/80, html.light [class*="bg-[#050811]"], html.light [class*="bg-[#080d1a]"],
+html.light [class*="bg-[#04060d]"] {
   background-color: var(--if-bg-subtle) !important;
+}
+html.light [class*="bg-[#0b1326]"] {
+  background-color: var(--if-surface-raised) !important;
+}
+html.light .from-cyan-900\/60 {
+  background: var(--if-accent-soft) !important;
+  color: var(--if-text) !important;
 }
 html.light .bg-slate-900, html.light .bg-slate-900\/95, html.light .bg-slate-900\/90,
 html.light .bg-slate-900\/80, html.light .bg-slate-900\/65, html.light .bg-slate-900\/55,
@@ -137,7 +145,7 @@ html.light .text-slate-300, html.light .text-slate-400 { color: var(--if-text-se
 html.light .text-slate-500, html.light .text-slate-600 { color: var(--if-text-muted) !important; }
 /* Readable text colors: cyan remains the visual accent on icons/backgrounds,
    while small textual actions use a darker blue in light mode. */
-html.light .text-cyan-200, html.light .text-cyan-300, html.light .text-cyan-400,
+html.light .text-cyan-50, html.light .text-cyan-200, html.light .text-cyan-300, html.light .text-cyan-400,
 html.light .text-cyan-500, html.light .text-blue-300, html.light .text-blue-400,
 html.light [class*="text-[#00f2fe]"] { color: var(--if-action-text) !important; text-shadow: none !important; filter: none !important; }
 html.light svg.text-cyan-200, html.light svg.text-cyan-300, html.light svg.text-cyan-400,
@@ -197,9 +205,9 @@ html.light .asset-visual-glow { display: none; }
 .admin-quick-action { background: var(--if-surface-raised); border: 1px solid var(--if-border); transition: transform 200ms ease, box-shadow 200ms ease, border-color 200ms ease; }
 .admin-quick-action:hover { transform: translateY(-1px); border-color: color-mix(in srgb, var(--if-admin-accent) 32%, var(--if-border)); box-shadow: var(--if-shadow-soft); }
 
-html.light .admin-shell .text-purple-200, html.light .admin-shell .text-purple-300,
-html.light .admin-shell .text-purple-400, html.light .admin-shell .text-indigo-300,
-html.light .admin-shell .text-indigo-400 { color: var(--if-admin-accent) !important; }
+html.light .text-purple-200, html.light .text-purple-300,
+html.light .text-purple-400, html.light .text-indigo-300,
+html.light .text-indigo-400 { color: var(--if-admin-accent) !important; }
 html.light .admin-shell .border-purple-900\/40, html.light .admin-shell .border-purple-500\/40,
 html.light .admin-shell .border-purple-500\/30, html.light .admin-shell .border-indigo-900\/40 {
   border-color: color-mix(in srgb, var(--if-admin-accent) 22%, var(--if-border)) !important;
