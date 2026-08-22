@@ -215,11 +215,11 @@ export const Tickets: React.FC<TicketsProps> = ({ isCreateOpen = false, onCloseC
               <LifeBuoy className="w-7 h-7 animate-spin-slow" />
             </div>
             <div>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <h2 className="text-xl font-black text-white tracking-tight">
                   {isFinalUser ? 'Meus Chamados de Suporte' : 'Central de Chamados & Helpdesk'}
                 </h2>
-                <span className="text-xs bg-[#00f2fe]/10 text-[#00f2fe] border border-[#00f2fe]/30 px-3 py-0.5 rounded-full font-bold">
+                <span className="text-xs md:text-sm bg-[#00f2fe]/10 text-[#00f2fe] border border-[#00f2fe]/30 px-3 py-1 rounded-full font-bold flex items-center justify-center whitespace-nowrap">
                   {isFinalUser ? 'USUÁRIO' : 'NOC // Suporte Ativo'}
                 </span>
               </div>

@@ -78,7 +78,7 @@ export const ExportDropdown: React.FC<ExportDropdownProps> = ({
     <div className={`relative inline-block text-left z-30 ${className}`} ref={menuRef}>
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-2 px-3.5 py-2.5 bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white font-semibold text-xs rounded-xl border border-slate-700 transition-all cursor-pointer shadow-sm"
+        className="flex items-center gap-2 px-3.5 h-full min-h-[40px] bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white font-semibold text-xs rounded-xl border border-slate-700 transition-all cursor-pointer shadow-sm w-full"
       >
         <Download className="w-4 h-4 text-slate-300" />
         <span>{buttonLabel}</span>

@@ -523,10 +523,10 @@ export const Assets: React.FC<AssetsProps> = ({ lensImport, onLensImportConsumed
           <p className="text-xs text-slate-400">Telemetria em tempo real, serial, hostname e portas ativas</p>
         </div>
 
-        <div className="grid grid-cols-[44px_1fr_1fr] sm:flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-3">
           <button
             onClick={fetchData}
-            className="p-2.5 bg-[#080d1a] hover:bg-slate-800 border border-slate-800 rounded-xl text-slate-400 hover:text-white"
+            className="flex items-center justify-center h-10 w-10 bg-[#080d1a] hover:bg-slate-800 border border-slate-800 rounded-xl text-slate-400 hover:text-white shrink-0"
             title="Recarregar Ativos"
           >
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
@@ -534,6 +534,7 @@ export const Assets: React.FC<AssetsProps> = ({ lensImport, onLensImportConsumed
 
           {/* Reusable Export Dropdown */}
           <ExportDropdown
+            className="h-10"
             options={[
               {
                 id: 'csv-assets',
@@ -554,7 +555,7 @@ export const Assets: React.FC<AssetsProps> = ({ lensImport, onLensImportConsumed
 
           <button
             onClick={handleOpenCreateModal}
-            className="flex items-center gap-2 bg-gradient-to-r from-[#00f2fe] to-[#0284c7] hover:from-cyan-400 hover:to-blue-500 text-slate-950 font-bold text-xs px-4 py-2.5 rounded-xl shadow-lg shadow-cyan-500/20 transition-all"
+            className="flex items-center justify-center h-10 gap-2 bg-gradient-to-r from-[#00f2fe] to-[#0284c7] hover:from-cyan-400 hover:to-blue-500 text-slate-950 font-bold text-xs px-4 rounded-xl shadow-lg shadow-cyan-500/20 transition-all shrink-0"
           >
             <Plus className="w-4 h-4" /> Novo Ativo
           </button>
@@ -746,7 +747,7 @@ export const Assets: React.FC<AssetsProps> = ({ lensImport, onLensImportConsumed
       {/* Asset Details Modal */}
       {selectedAsset && (
         <div className="responsive-modal-backdrop">
-          <div className="responsive-modal-panel bg-[#080d1a] border-cyan-500/20 max-w-lg relative">
+          <div className="responsive-modal-panel bg-[#080d1a] border-cyan-500/20 max-w-lg relative pb-28 md:pb-6 max-h-[85vh] overflow-y-auto">
             <button
               onClick={() => setSelectedAsset(null)}
               className="absolute top-5 right-5 p-2 text-slate-400 hover:text-white rounded-xl bg-slate-800"
@@ -851,7 +852,7 @@ export const Assets: React.FC<AssetsProps> = ({ lensImport, onLensImportConsumed
       {/* Asset Creation & Editing Modal */}
       {isModalOpen && (
         <div className="responsive-modal-backdrop">
-          <div className="responsive-modal-panel bg-[#080d1a] border-cyan-500/20 max-w-md relative">
+          <div className="responsive-modal-panel bg-[#080d1a] border-cyan-500/20 max-w-md relative pb-28 md:pb-6 max-h-[85vh] overflow-y-auto">
             <button
               onClick={() => setIsModalOpen(false)}
               className="absolute top-5 right-5 p-2 text-slate-400 hover:text-white rounded-xl bg-slate-800"

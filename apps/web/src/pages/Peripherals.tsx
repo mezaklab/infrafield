@@ -539,11 +539,11 @@ export const Peripherals: React.FC<PeripheralsProps> = ({ defaultSubTab = 'TODOS
           </div>
         </div>
 
-        <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex flex-wrap items-center gap-3">
           <button
             onClick={loadData}
             disabled={loading}
-            className="p-2.5 bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-white rounded-xl border border-slate-800 transition-all flex items-center gap-1.5 text-xs font-semibold"
+            className="flex items-center justify-center h-10 px-3 bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-white rounded-xl border border-slate-800 transition-all gap-1.5 text-xs font-semibold shrink-0"
           >
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin text-[#00f2fe]' : ''}`} />
             <span className="hidden sm:inline">Sincronizar</span>
@@ -551,6 +551,7 @@ export const Peripherals: React.FC<PeripheralsProps> = ({ defaultSubTab = 'TODOS
 
           {/* Export Dropdown */}
           <ExportDropdown
+            className="h-10"
             options={[
               {
                 id: 'csv-filtered',
@@ -585,7 +586,7 @@ export const Peripherals: React.FC<PeripheralsProps> = ({ defaultSubTab = 'TODOS
 
           <button
             onClick={handleOpenCreateModal}
-            className="flex items-center gap-2 bg-[#00f2fe] hover:bg-cyan-400 text-slate-950 font-extrabold text-xs px-4 py-2.5 rounded-xl shadow-[0_0_15px_rgba(0,242,254,0.3)] transition-all"
+            className="flex items-center justify-center h-10 gap-2 bg-[#00f2fe] hover:bg-cyan-400 text-slate-950 font-extrabold text-xs px-4 rounded-xl shadow-[0_0_15px_rgba(0,242,254,0.3)] transition-all shrink-0"
           >
             <Plus className="w-4 h-4 stroke-[3]" />
             <span>Novo Ativo</span>
@@ -945,7 +946,7 @@ export const Peripherals: React.FC<PeripheralsProps> = ({ defaultSubTab = 'TODOS
       {/* ── Create / Edit Modal ───────────────────────────────────── */}
       {isModalOpen && (
         <div className="responsive-modal-backdrop">
-          <div className="responsive-modal-panel bg-[#080d1a] border-cyan-500/30 max-w-xl space-y-5 custom-scrollbar">
+          <div className="responsive-modal-panel bg-[#080d1a] border-cyan-500/30 max-w-xl space-y-5 custom-scrollbar pb-28 md:pb-6 max-h-[85vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-slate-800 pb-4">
               <div className="flex items-center gap-3">
                 <div className="p-2.5 bg-[#00f2fe]/10 text-[#00f2fe] rounded-2xl border border-[#00f2fe]/20">
