@@ -208,7 +208,7 @@ export const Tickets: React.FC<TicketsProps> = ({ isCreateOpen = false, onCloseC
   return (
     <div className="space-y-6">
       {/* Action Header Banner */}
-      <div className="bg-[#080d1a] border border-cyan-500/20 rounded-3xl p-6 shadow-2xl relative overflow-hidden backdrop-blur-md">
+      <div className="bg-[#080d1a] border border-cyan-500/20 rounded-3xl p-6 shadow-2xl relative z-20 backdrop-blur-md">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="flex items-center gap-4">
             <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center text-white font-bold shadow-lg shadow-cyan-500/20 shrink-0">
@@ -231,8 +231,9 @@ export const Tickets: React.FC<TicketsProps> = ({ isCreateOpen = false, onCloseC
             </div>
           </div>
 
-          <div className="flex items-center gap-2 flex-wrap shrink-0">
+          <div className="flex flex-wrap items-center gap-3 shrink-0">
             <ExportDropdown
+              className="h-11"
               options={[
                 {
                   id: 'pdf-inventory',
@@ -253,9 +254,9 @@ export const Tickets: React.FC<TicketsProps> = ({ isCreateOpen = false, onCloseC
 
             <button
               onClick={() => setIsCreateModalOpen(true)}
-              className="flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl bg-gradient-to-r from-cyan-500 via-blue-600 to-indigo-600 hover:from-cyan-400 hover:to-indigo-500 text-white font-extrabold text-xs shadow-xl shadow-cyan-500/30 transition-all cursor-pointer"
+              className="flex items-center justify-center gap-2 h-11 px-5 rounded-xl bg-gradient-to-r from-cyan-500 via-blue-600 to-indigo-600 hover:from-cyan-400 hover:to-indigo-500 text-white font-extrabold text-xs shadow-xl shadow-cyan-500/30 transition-all cursor-pointer"
             >
-              <Plus className="w-4 h-4" /> <span>Abrir Novo Chamado</span>
+              <Plus className="w-4 h-4 shrink-0" /> <span>Abrir Novo Chamado</span>
             </button>
           </div>
         </div>

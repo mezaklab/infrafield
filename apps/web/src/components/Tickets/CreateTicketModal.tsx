@@ -10,7 +10,7 @@ import {
   Image as ImageIcon,
   Film,
   Trash2,
-  Sparkles,
+  Ticket,
   Laptop
   ,MapPin
 } from 'lucide-react';
@@ -130,6 +130,17 @@ export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
     fetchCategories();
   }, [isOpen, user]);
 
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -202,6 +213,9 @@ export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
         assetId: assetId || undefined,
         priority,
         attachments: attachmentUrls,
+        user_id: user?.id,
+        nome: user?.name,
+        email: user?.email,
       });
 
       // Reset form
@@ -229,7 +243,7 @@ export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
         <div className="flex items-center justify-between border-b border-slate-800/80 pb-4">
           <div className="flex items-center gap-3">
             <div className="p-3 bg-gradient-to-tr from-cyan-500/20 to-blue-500/20 text-[#00f2fe] rounded-2xl border border-[#00f2fe]/30 shadow-[0_0_15px_rgba(0,242,254,0.15)]">
-              <Sparkles className="w-6 h-6" />
+              <Ticket className="w-6 h-6" />
             </div>
             <div>
               <h2 className="text-lg font-black text-white tracking-tight">Abertura de Novo Chamado</h2>

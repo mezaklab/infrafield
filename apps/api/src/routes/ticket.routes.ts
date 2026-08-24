@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { TicketStatus, TicketPriority, Role } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { getIO } from '../services/websocket.service';
-import { sendTicketNotification } from '../services/whatsapp.service';
+import { sendTicketNotification } from '../services/telegram.service';
 import { ticketCreationRateLimiter } from '../middlewares/rateLimit.middleware';
 import { requireRole } from '../middlewares/auth.middleware';
 import crypto from 'crypto';
@@ -25,6 +25,9 @@ const CreateTicketSchema = z.object({
   assetId: z.string().uuid('Ativo inválido').optional().nullable(),
   priority: z.nativeEnum(TicketPriority).optional().default(TicketPriority.MEDIA),
   attachments: z.array(z.string().max(500)).max(10).optional(),
+  user_id: z.string().optional(),
+  nome: z.string().optional(),
+  email: z.string().optional(),
 });
 
 const UpdateTicketSchema = z.object({
@@ -39,6 +42,9 @@ const UpdateTicketSchema = z.object({
 const CreateMessageSchema = z.object({
   content: z.string().trim().max(5000).optional().default(''),
   attachments: z.array(z.string().max(500)).max(10).optional(),
+  user_id: z.string().optional(),
+  nome: z.string().optional(),
+  email: z.string().optional(),
 });
 
 // Helper for broadcasting WebSocket events
@@ -101,7 +107,7 @@ ticketRouter.get('/dashboard', async (req: Request, res: Response) => {
     if (userRole !== Role.SUPERADMIN) {
       baseWhere.companyId = req.user!.companyId;
     }
-    if (userRole === Role.USUARIO) {
+    if (userRole === Role.USUARIO || userRole === Role.VIEWER) {
       baseWhere.authorId = userId;
     }
 
@@ -290,7 +296,7 @@ ticketRouter.get('/', async (req: Request, res: Response) => {
     }
 
     // Final users can only see their own created tickets
-    if (userRole === Role.USUARIO) {
+    if (userRole === Role.USUARIO || userRole === Role.VIEWER) {
       where.authorId = userId;
     }
 
@@ -376,7 +382,7 @@ ticketRouter.get('/:id', async (req: Request, res: Response) => {
     }
 
     // Permission check
-    if (userRole === Role.USUARIO && ticket.authorId !== userId) {
+    if ((userRole === Role.USUARIO || userRole === Role.VIEWER) && ticket.authorId !== userId) {
       return res.status(403).json({ error: 'Acesso negado a este chamado.' });
     }
 
@@ -395,8 +401,8 @@ ticketRouter.post('/', ticketCreationRateLimiter, async (req: Request, res: Resp
       return res.status(400).json({ error: 'Dados inválidos', details: parsed.error.format() });
     }
 
-    const { subject, description, categoryId, sectorId, locationId: bodyLocationId, assetId, priority, attachments } = parsed.data;
-    const authorId = req.user!.userId;
+    const { subject, description, categoryId, sectorId, locationId: bodyLocationId, assetId, priority, attachments, user_id } = parsed.data;
+    const authorId = user_id || req.user!.userId;
 
     const companyId = req.user!.companyId;
     const sector = await prisma.sector.findUnique({ where: { id: sectorId } });
@@ -471,7 +477,7 @@ ticketRouter.post('/', ticketCreationRateLimiter, async (req: Request, res: Resp
       authorId: createdTicket!.authorId,
     });
 
-    // Envia notificação para o grupo do WhatsApp usando o serviço dedicado
+    // Envia notificação para o grupo do Telegram usando o serviço dedicado
     if (createdTicket) {
       sendTicketNotification({
         code: createdTicket.code,
@@ -481,9 +487,10 @@ ticketRouter.post('/', ticketCreationRateLimiter, async (req: Request, res: Resp
         category: createdTicket.categoryRef?.name || 'Outros',
         author: createdTicket.author,
         location: createdTicket.location,
+        sector: createdTicket.sector,
         asset: createdTicket.asset,
       }).catch((err) => {
-        console.error('[TICKETS] Falha ao disparar notificação do WhatsApp:', err?.message);
+        console.error('[TICKETS] Falha ao disparar notificação do Telegram:', err?.message);
       });
     }
 
@@ -569,8 +576,8 @@ ticketRouter.post('/:id/messages', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Dados inválidos', details: parsed.error.format() });
     }
 
-    const { content, attachments } = parsed.data;
-    const senderId = req.user!.userId;
+    const { content, attachments, user_id } = parsed.data;
+    const senderId = user_id || req.user!.userId;
     const senderRole = req.user!.role;
 
     if (!content.trim() && (!attachments || attachments.length === 0)) {
@@ -587,7 +594,7 @@ ticketRouter.post('/:id/messages', async (req: Request, res: Response) => {
     }
 
     // Permission check for USUARIO
-    if (senderRole === Role.USUARIO && ticket.authorId !== senderId) {
+    if ((senderRole === Role.USUARIO || senderRole === Role.VIEWER) && ticket.authorId !== senderId) {
       return res.status(403).json({ error: 'Acesso negado a este chamado.' });
     }
 
@@ -608,7 +615,7 @@ ticketRouter.post('/:id/messages', async (req: Request, res: Response) => {
       // Auto-advance status if technician/admin responds to open ticket
       let nextStatus = ticket.status;
       if (
-        senderRole !== Role.USUARIO &&
+        senderRole !== Role.USUARIO && senderRole !== Role.VIEWER &&
         ticket.status === TicketStatus.ABERTO
       ) {
         nextStatus = TicketStatus.EM_ATENDIMENTO;

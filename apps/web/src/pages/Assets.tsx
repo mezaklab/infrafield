@@ -21,12 +21,14 @@ import {
   Edit3,
   Trash2,
   Monitor,
-  ExternalLink
+  ExternalLink,
+  Upload
 } from 'lucide-react';
 import { Asset, LensImportDraft, Location } from '../types';
 import { getAssets, createAsset, updateAsset, deleteAsset, getLocations, downloadInventoryPDFReport, exportAssetsCSV } from '../services/api';
 import { getSocket, StatusUpdatedPayload } from '../services/socket';
 import { getLocationFullName } from '../utils/location';
+import { ModalImportacaoCSV } from '../components/Assets/ModalImportacaoCSV';
 import { ExportDropdown } from '../components/Layout/ExportDropdown';
 import { getGenericAssetKind } from '../utils/assetPresentation';
 
@@ -104,6 +106,7 @@ export const Assets: React.FC<AssetsProps> = ({ lensImport, onLensImportConsumed
 
   // Modal State for Create & Edit
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [editingAssetId, setEditingAssetId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
@@ -126,6 +129,17 @@ export const Assets: React.FC<AssetsProps> = ({ lensImport, onLensImportConsumed
     imageUrl: '',
     wifiBands: '',
   });
+
+  useEffect(() => {
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setSelectedAsset(null);
+        setIsModalOpen(false);
+      }
+    };
+    window.addEventListener('keydown', handleEsc);
+    return () => window.removeEventListener('keydown', handleEsc);
+  }, []);
 
   useEffect(() => {
     if (!lensImport) return;
@@ -554,6 +568,13 @@ export const Assets: React.FC<AssetsProps> = ({ lensImport, onLensImportConsumed
           />
 
           <button
+            onClick={() => setIsImportModalOpen(true)}
+            className="flex items-center justify-center h-10 gap-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 font-bold text-xs px-4 rounded-xl transition-all shrink-0"
+          >
+            <Upload className="w-4 h-4" /> Importar CSV
+          </button>
+
+          <button
             onClick={handleOpenCreateModal}
             className="flex items-center justify-center h-10 gap-2 bg-gradient-to-r from-[#00f2fe] to-[#0284c7] hover:from-cyan-400 hover:to-blue-500 text-slate-950 font-bold text-xs px-4 rounded-xl shadow-lg shadow-cyan-500/20 transition-all shrink-0"
           >
@@ -746,8 +767,8 @@ export const Assets: React.FC<AssetsProps> = ({ lensImport, onLensImportConsumed
 
       {/* Asset Details Modal */}
       {selectedAsset && (
-        <div className="responsive-modal-backdrop">
-          <div className="responsive-modal-panel bg-[#080d1a] border-cyan-500/20 max-w-lg relative pb-28 md:pb-6 max-h-[85vh] overflow-y-auto">
+        <div className="responsive-modal-backdrop" onClick={() => setSelectedAsset(null)}>
+          <div className="responsive-modal-panel bg-[#080d1a] border-cyan-500/20 max-w-lg relative max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
             <button
               onClick={() => setSelectedAsset(null)}
               className="absolute top-5 right-5 p-2 text-slate-400 hover:text-white rounded-xl bg-slate-800"
@@ -851,8 +872,8 @@ export const Assets: React.FC<AssetsProps> = ({ lensImport, onLensImportConsumed
 
       {/* Asset Creation & Editing Modal */}
       {isModalOpen && (
-        <div className="responsive-modal-backdrop">
-          <div className="responsive-modal-panel bg-[#080d1a] border-cyan-500/20 max-w-md relative pb-28 md:pb-6 max-h-[85vh] overflow-y-auto">
+        <div className="responsive-modal-backdrop" onClick={() => setIsModalOpen(false)}>
+          <div className="responsive-modal-panel bg-[#080d1a] border-cyan-500/20 max-w-md relative max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
             <button
               onClick={() => setIsModalOpen(false)}
               className="absolute top-5 right-5 p-2 text-slate-400 hover:text-white rounded-xl bg-slate-800"
@@ -1116,6 +1137,15 @@ export const Assets: React.FC<AssetsProps> = ({ lensImport, onLensImportConsumed
           </div>
         </div>
       )}
+      
+      <ModalImportacaoCSV
+        isOpen={isImportModalOpen}
+        onClose={() => setIsImportModalOpen(false)}
+        onSuccess={() => {
+          setIsImportModalOpen(false);
+          fetchData();
+        }}
+      />
     </div>
   );
 };

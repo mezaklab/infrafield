@@ -12,6 +12,10 @@
     "build": "npm --workspaces run build"
   },
   "devDependencies": {
+    "@types/papaparse": "^5.5.2",
     "concurrently": "^8.2.2"
+  },
+  "dependencies": {
+    "papaparse": "^5.6.0"
   }
 }

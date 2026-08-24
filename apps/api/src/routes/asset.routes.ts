@@ -379,6 +379,61 @@ assetRouter.post('/onboard', async (req: Request, res: Response) => {
   }
 });
 
+// POST /api/assets/bulk - Import assets from CSV
+assetRouter.post('/bulk', async (req: Request, res: Response) => {
+  try {
+    const { assets } = req.body;
+    if (!Array.isArray(assets) || assets.length === 0) {
+      return res.status(400).json({ error: 'Nenhum ativo válido fornecido.' });
+    }
+
+    const companyId = req.user?.companyId;
+    if (!companyId) {
+      return res.status(400).json({ error: 'Empresa do usuário não identificada.' });
+    }
+
+    let createdCount = 0;
+
+    for (const item of assets) {
+      const { Categoria, Patrimonio, MAC_Address, Fabricante, Modelo, Status } = item;
+      
+      const code = Patrimonio || `AST-${Date.now().toString().slice(-6)}-${Math.random().toString(36).substring(2, 5).toUpperCase()}`;
+      const name = Modelo ? `${Fabricante || 'Desconhecido'} ${Modelo}` : `Ativo ${code}`;
+      
+      // Default to Redes & Switches if no category is provided
+      const category = Categoria || 'Redes & Switches';
+      
+      let mappedStatus: AssetStatus = AssetStatus.OPERATIONAL;
+      if (Status) {
+        const s = Status.toUpperCase();
+        if (s.includes('MANUTENÇÃO') || s.includes('MAINTENANCE')) mappedStatus = AssetStatus.MAINTENANCE;
+        else if (s.includes('CRÍTICO') || s.includes('CRITICAL')) mappedStatus = AssetStatus.CRITICAL;
+        else if (s.includes('INATIVO') || s.includes('INACTIVE')) mappedStatus = AssetStatus.INACTIVE;
+      }
+
+      await prisma.asset.create({
+        data: {
+          name,
+          code,
+          category,
+          assetTag: Patrimonio || undefined,
+          macAddress: MAC_Address || undefined,
+          status: mappedStatus,
+          companyId,
+          // We could resolve the location ID by name, but for simplicity we omit it if it requires a lookup
+          // If a sophisticated lookup is required, it should be done here.
+        }
+      });
+      createdCount++;
+    }
+
+    return res.status(201).json({ success: true, count: createdCount });
+  } catch (error) {
+    console.error('[ASSETS] POST /bulk error:', error);
+    return res.status(500).json({ error: 'Erro ao importar ativos em lote.' });
+  }
+});
+
 // POST /api/assets - Create asset
 assetRouter.post('/', async (req: Request, res: Response) => {
   try {

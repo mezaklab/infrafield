@@ -946,7 +946,7 @@ export const Peripherals: React.FC<PeripheralsProps> = ({ defaultSubTab = 'TODOS
       {/* ── Create / Edit Modal ───────────────────────────────────── */}
       {isModalOpen && (
         <div className="responsive-modal-backdrop">
-          <div className="responsive-modal-panel bg-[#080d1a] border-cyan-500/30 max-w-xl space-y-5 custom-scrollbar pb-28 md:pb-6 max-h-[85vh] overflow-y-auto">
+          <div className="responsive-modal-panel bg-[#080d1a] border-cyan-500/30 max-w-xl space-y-5 custom-scrollbar max-h-[85vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-slate-800 pb-4">
               <div className="flex items-center gap-3">
                 <div className="p-2.5 bg-[#00f2fe]/10 text-[#00f2fe] rounded-2xl border border-[#00f2fe]/20">

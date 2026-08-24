@@ -12,7 +12,7 @@ import {
   Clock,
   CheckCircle2,
   XCircle
-  ,MapPin
+  
 } from 'lucide-react';
 import { api } from '../../services/api';
 import { Ticket, TicketStatus, TicketPriority, SystemUser } from '../../types';
@@ -32,9 +32,7 @@ interface UploadedFile {
   mimetype: string;
 }
 
-interface SectorOption { id: string; name: string }
-interface LocationOption { id: string; name: string }
-interface CategoryOption { id: string; name: string }
+
 
 export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({
   ticketId,
@@ -42,14 +40,12 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({
   onClose,
   onTicketUpdated,
 }) => {
-  const { isAdmin, isTechnician } = useAuth();
+  const { isAdmin, isTechnician, user } = useAuth();
   const canManageTicket = isAdmin || isTechnician;
 
   const [ticket, setTicket] = useState<Ticket | null>(null);
   const [technicians, setTechnicians] = useState<SystemUser[]>([]);
-  const [sectors, setSectors] = useState<SectorOption[]>([]);
-  const [locations, setLocations] = useState<LocationOption[]>([]);
-  const [categories, setCategories] = useState<CategoryOption[]>([]);
+
   const [loading, setLoading] = useState<boolean>(true);
 
   // Message reply state
@@ -89,37 +85,10 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({
     }
   };
 
-  const fetchSectors = async () => {
-    try {
-      const res = await api.get<{ data: SectorOption[] }>('/sectors');
-      setSectors(res.data?.data || []);
-    } catch {
-      setError('Não foi possível carregar os setores.');
-    }
-  };
-  const fetchLocations = async () => {
-    try {
-      const res = await api.get<LocationOption[]>('/tickets/locations');
-      setLocations(res.data || []);
-    } catch {
-      setError('Não foi possível carregar as localidades.');
-    }
-  };
-  const fetchCategories = async () => {
-    try {
-      const res = await api.get<{ data: CategoryOption[] }>('/categories');
-      setCategories(res.data?.data || []);
-    } catch {
-      setError('Não foi possível carregar as categorias.');
-    }
-  };
 
   useEffect(() => {
     if (isOpen && ticketId) {
       fetchTicketDetails();
-      fetchSectors();
-      fetchLocations();
-      fetchCategories();
       if (canManageTicket) {
         fetchTechnicians();
       }
@@ -130,6 +99,17 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [ticket?.messages]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
 
   if (!isOpen || !ticketId) return null;
 
@@ -146,6 +126,19 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({
     }
   };
 
+  const handlePriorityChange = async (newPriority: TicketPriority) => {
+    try {
+      setIsUpdatingStatus(true);
+      await api.patch(`/tickets/${ticketId}`, { priority: newPriority });
+      await fetchTicketDetails();
+      onTicketUpdated();
+    } catch (err) {
+      setError('Erro ao atualizar prioridade do chamado.');
+    } finally {
+      setIsUpdatingStatus(false);
+    }
+  };
+
   const handleAssignTechnician = async (techId: string) => {
     try {
       setIsUpdatingStatus(true);
@@ -154,47 +147,6 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({
       onTicketUpdated();
     } catch (err) {
       setError('Erro ao atribuir técnico responsável.');
-    } finally {
-      setIsUpdatingStatus(false);
-    }
-  };
-
-  const handleLocationChange = async (locationId: string) => {
-    try {
-      setIsUpdatingStatus(true);
-      await api.patch(`/tickets/${ticketId}`, { locationId });
-      await fetchTicketDetails();
-      onTicketUpdated();
-    } catch {
-      setError('Erro ao atualizar localização do chamado.');
-    } finally {
-      setIsUpdatingStatus(false);
-    }
-  };
-
-  const handleSectorChange = async (newSectorId: string) => {
-    try {
-      setIsUpdatingStatus(true);
-      setError(null);
-      await api.patch(`/tickets/${ticketId}`, { sectorId: newSectorId });
-      await fetchTicketDetails();
-      onTicketUpdated();
-    } catch (err: any) {
-      setError(err.response?.data?.error || 'Erro ao atualizar o setor do chamado.');
-    } finally {
-      setIsUpdatingStatus(false);
-    }
-  };
-
-  const handleCategoryChange = async (newCategoryId: string) => {
-    try {
-      setIsUpdatingStatus(true);
-      setError(null);
-      await api.patch(`/tickets/${ticketId}`, { categoryId: newCategoryId });
-      await fetchTicketDetails();
-      onTicketUpdated();
-    } catch (err: any) {
-      setError(err.response?.data?.error || 'Erro ao atualizar a categoria do chamado.');
     } finally {
       setIsUpdatingStatus(false);
     }
@@ -240,6 +192,9 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({
       await api.post(`/tickets/${ticketId}/messages`, {
         content: replyText.trim(),
         attachments: attachmentUrls,
+        user_id: user?.id,
+        nome: user?.name,
+        email: user?.email,
       });
 
       setReplyText('');
@@ -385,7 +340,7 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({
 
           {/* Detailed Info Grid */}
           {ticket && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 text-xs bg-[#050811] p-3.5 rounded-2xl border border-slate-800/80 font-mono">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-7 gap-3 text-xs bg-[#050811] p-3.5 rounded-2xl border border-slate-800/80 font-mono">
               <div>
                 <span className="text-[10px] text-slate-500 font-sans block font-semibold">Solicitante (Autor)</span>
                 <span className="text-white font-bold block truncate">{ticket.author?.name}</span>
@@ -394,45 +349,17 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({
 
               <div>
                 <span className="text-[10px] text-slate-500 font-sans block font-semibold">Setor</span>
-                {canManageTicket && ticket.sectorId ? (
-                  <select
-                    disabled={isUpdatingStatus}
-                    value={ticket.sectorId}
-                    onChange={(e) => handleSectorChange(e.target.value)}
-                    className="w-full max-w-full mt-0.5 bg-slate-900 border border-slate-800 text-cyan-300 font-bold rounded-lg px-2 py-1 outline-none text-xs"
-                  >
-                    {sectors.map((sector) => <option key={sector.id} value={sector.id}>{sector.name}</option>)}
-                  </select>
-                ) : (
-                  <span className="text-cyan-300 font-bold block truncate">{ticket.sector?.name || 'Não especificado'}</span>
-                )}
+                <span className="text-cyan-300 font-bold block truncate">{ticket.sector?.name || 'Não especificado'}</span>
               </div>
 
               <div>
                 <span className="text-[10px] text-slate-500 font-sans block font-semibold">Localização</span>
-                {canManageTicket ? (
-                  <select disabled={isUpdatingStatus} value={ticket.locationId || ''} onChange={(e) => handleLocationChange(e.target.value)} className="w-full max-w-full mt-0.5 bg-slate-900 border border-slate-800 text-cyan-300 font-bold rounded-lg px-2 py-1 outline-none text-xs">
-                    <option value="" disabled>Selecione...</option>
-                    {locations.map((location) => <option key={location.id} value={location.id}>{location.name}</option>)}
-                  </select>
-                ) : <span className="text-cyan-300 font-bold block truncate"><MapPin className="inline h-3 w-3 mr-1" />{ticket.location?.name || 'Não especificada'}</span>}
+                <span className="text-cyan-300 font-bold block truncate">{ticket.location?.name || 'Não especificada'}</span>
               </div>
 
               <div>
                 <span className="text-[10px] text-slate-500 font-sans block font-semibold">Categoria</span>
-                {canManageTicket ? (
-                  <select
-                    disabled={isUpdatingStatus}
-                    value={ticket.categoryId || ''}
-                    onChange={(e) => handleCategoryChange(e.target.value)}
-                    className="w-full max-w-full mt-0.5 bg-slate-900 border border-slate-800 text-cyan-300 font-bold rounded-lg px-2 py-1 outline-none text-xs"
-                  >
-                    <option value="" disabled>Não especificada</option>
-                    {categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
-                  </select>
-                ) : (
-                  <span className="text-cyan-300 font-bold block truncate">{ticket.categoryRef?.name || ticket.category || 'Não especificada'}</span>
-                )}
+                <span className="text-cyan-300 font-bold block truncate">{ticket.categoryRef?.name || ticket.category || 'Não especificada'}</span>
               </div>
 
               <div>
@@ -460,6 +387,25 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({
                   </select>
                 ) : (
                   <span className="text-purple-300 font-bold block truncate">{ticket.assignedTo?.name || 'Aguardando Técnico'}</span>
+                )}
+              </div>
+
+              <div>
+                <span className="text-[10px] text-slate-500 font-sans block font-semibold">Prioridade</span>
+                {canManageTicket ? (
+                  <select
+                    disabled={isUpdatingStatus}
+                    value={ticket.priority}
+                    onChange={(e) => handlePriorityChange(e.target.value as TicketPriority)}
+                    className="w-full mt-0.5 bg-slate-900 border border-slate-800 text-blue-300 font-bold rounded-lg px-2 py-1 outline-none text-xs"
+                  >
+                    <option value="BAIXA">🟢 Baixa</option>
+                    <option value="MEDIA">🟡 Média</option>
+                    <option value="ALTA">🟠 Alta</option>
+                    <option value="CRITICA">🔴 Crítica</option>
+                  </select>
+                ) : (
+                  <span className="text-blue-300 font-bold block">{ticket.priority}</span>
                 )}
               </div>
 
@@ -508,6 +454,21 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({
                 }
               }
 
+              // Define badge properties based on true role
+              let roleBadgeText = 'USUÁRIO';
+              let roleBadgeColor = 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30';
+              
+              if (msg.sender?.role === 'SUPERADMIN' || msg.sender?.role === 'ADMIN') {
+                roleBadgeText = 'ADMIN';
+                roleBadgeColor = 'bg-rose-500/20 text-rose-300 border border-rose-500/30';
+              } else if (msg.sender?.role === 'MANAGER') {
+                roleBadgeText = 'GERENTE';
+                roleBadgeColor = 'bg-amber-500/20 text-amber-300 border border-amber-500/30';
+              } else if (msg.sender?.role === 'TECHNICIAN') {
+                roleBadgeText = 'TÉCNICO';
+                roleBadgeColor = 'bg-purple-500/20 text-purple-300 border border-purple-500/30';
+              }
+
               return (
                 <div
                   key={msg.id}
@@ -534,12 +495,8 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({
                     <div className="flex items-center justify-between gap-4 border-b border-slate-800/80 pb-2 text-xs">
                       <div className="flex items-center gap-2">
                         <span className="font-extrabold text-white">{msg.sender?.name}</span>
-                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                          isAuthorMessage
-                            ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
-                            : 'bg-purple-500/20 text-purple-300 border border-purple-500/30'
-                        }`}>
-                          {isAuthorMessage ? 'USUÁRIO' : msg.sender?.role || 'TÉCNICO TI'}
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${roleBadgeColor}`}>
+                          {roleBadgeText}
                         </span>
                       </div>
 

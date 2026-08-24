@@ -1,3 +1,5 @@
+#!/bin/bash
+cat << 'INNER_EOF' > temp.ts
 import { Router, Request, Response } from 'express';
 import { prisma } from '../lib/prisma';
 import { sendTelegramNotification } from '../services/telegram.service';
@@ -65,3 +67,6 @@ notificationRouter.post('/test', async (_req: Request, res: Response) => {
     return res.status(500).json({ error: 'Erro interno ao enviar mensagem de teste', details: error.message });
   }
 });
+INNER_EOF
+
+mv temp.ts apps/api/src/routes/notification.routes.ts
