@@ -40,7 +40,7 @@ interface SettingsData {
 
 export const Settings: React.FC = () => {
   // Settings & WhatsApp State
-  const [settings, setSettings] = useState<SettingsData>({
+  const [, setSettings] = useState<SettingsData>({
     whatsapp_group_id: null,
     whatsapp_group_name: null,
     whatsapp_status: 'DISCONNECTED',
@@ -192,7 +192,7 @@ export const Settings: React.FC = () => {
   const handleTestSend = async () => {
     try {
       setTestingSend(true);
-      const res = await api.post("/notifications/test");
+      await api.post("/notifications/test");
       
       
       setFeedback({ type: 'success', message: 'Mensagem de teste enviada com sucesso para o grupo do Telegram!' });
