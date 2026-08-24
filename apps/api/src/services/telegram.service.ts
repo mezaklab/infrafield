@@ -79,7 +79,7 @@ export async function sendTicketNotification(ticketData: TicketNotificationData)
       : 'Não informado');
 
   const priority = getPriorityPresentation(ticketData.priority);
-  const dashboardUrl = (process.env.WEB_APP_URL || process.env.FRONTEND_URL || 'http://localhost:5173')
+  const dashboardUrl = (process.env.APP_BASE_URL || 'http://localhost:5173')
     .replace(/\/+$/, '');
 
   const formattedMessage = [
