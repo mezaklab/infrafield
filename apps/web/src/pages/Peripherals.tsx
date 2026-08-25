@@ -206,6 +206,7 @@ export const Peripherals: React.FC<PeripheralsProps> = ({ defaultSubTab = 'TODOS
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState<boolean>(false);
   const [editingItem, setEditingItem] = useState<Peripheral | null>(null);
+  const [viewingItem, setViewingItem] = useState<Peripheral | null>(null);
   const [isSaving, setIsSaving] = useState<boolean>(false);
 
   const tableRef = useRef<HTMLTableElement>(null);
@@ -254,7 +255,10 @@ export const Peripherals: React.FC<PeripheralsProps> = ({ defaultSubTab = 'TODOS
     onLensImportConsumed?.();
   }, [lensImport, locations, onLensImportConsumed]);
 
-  useEscapeKey(() => setIsModalOpen(false), isModalOpen);
+  useEscapeKey(() => {
+    setIsModalOpen(false);
+    setViewingItem(null);
+  }, isModalOpen || !!viewingItem);
 
   const setActiveSubTab = (sub: PeripheralsSubTab) => {
     setActiveSubTabState(sub);
@@ -299,14 +303,12 @@ export const Peripherals: React.FC<PeripheralsProps> = ({ defaultSubTab = 'TODOS
     return () => { socket.off('statusUpdated', handleStatusUpdated); };
   }, [loadData]);
 
-  // Re-fetch on focus/storage/onboarding
+  // Re-fetch on storage/onboarding (focus disabled)
   useEffect(() => {
     const handleReFetch = () => { loadData(); };
-    window.addEventListener('focus', handleReFetch);
     window.addEventListener('storage', handleReFetch);
     window.addEventListener('infrafield:assetOnboarded', handleReFetch);
     return () => {
-      window.removeEventListener('focus', handleReFetch);
       window.removeEventListener('storage', handleReFetch);
       window.removeEventListener('infrafield:assetOnboarded', handleReFetch);
     };
@@ -844,7 +846,11 @@ export const Peripherals: React.FC<PeripheralsProps> = ({ defaultSubTab = 'TODOS
                   const CatIcon = catCfg.icon;
 
                   return (
-                    <tr key={item.id} className="hover:bg-[#0b1326] transition-colors group">
+                    <tr 
+                      key={item.id} 
+                      onClick={() => setViewingItem(item)}
+                      className="hover:bg-slate-800/50 cursor-pointer transition-colors group"
+                    >
                       {/* Código / Patrimônio */}
                       <td className="py-4 px-4">
                         <div className="font-mono font-bold text-[#00f2fe] text-xs">{item.code}</div>
@@ -930,7 +936,10 @@ export const Peripherals: React.FC<PeripheralsProps> = ({ defaultSubTab = 'TODOS
                       <td className="py-4 px-4 text-right">
                         <div className="flex items-center justify-end gap-1.5">
                           <button
-                            onClick={() => handleOpenEditModal(item)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleOpenEditModal(item);
+                            }}
                             className="p-2 bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white rounded-xl border border-slate-800 transition-all"
                             title="Editar"
                           >
@@ -938,7 +947,10 @@ export const Peripherals: React.FC<PeripheralsProps> = ({ defaultSubTab = 'TODOS
                           </button>
                           {isAdmin && (
                             <button
-                              onClick={() => handleDelete(item.id, item.name)}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDelete(item.id, item.name);
+                              }}
                               className="p-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 rounded-xl border border-rose-500/20 transition-all"
                               title="Excluir"
                             >
@@ -952,6 +964,194 @@ export const Peripherals: React.FC<PeripheralsProps> = ({ defaultSubTab = 'TODOS
                 })}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+
+      {/* ── View Details Modal ─────────────────────────────────────── */}
+      {viewingItem && (
+        <div className="responsive-modal-backdrop" onClick={() => setViewingItem(null)}>
+          <div className="responsive-modal-panel bg-[#080d1a] border-cyan-500/30 max-w-lg relative max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <button
+              onClick={() => setViewingItem(null)}
+              className="absolute top-5 right-5 p-2 text-slate-400 hover:text-white rounded-xl bg-slate-800"
+            >
+              <X className="w-4 h-4" />
+            </button>
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-3 bg-[#00f2fe]/10 text-[#00f2fe] rounded-2xl border border-[#00f2fe]/20">
+                {(() => {
+                  const CIcon = getCategoryConfig(viewingItem.category, viewingItem.subcategory).icon;
+                  return <CIcon className="w-6 h-6" />;
+                })()}
+              </div>
+              <div>
+                <span className="text-xs font-mono font-bold text-[#00f2fe] bg-[#00f2fe]/10 border border-[#00f2fe]/20 px-2.5 py-0.5 rounded-lg">
+                  {viewingItem.code}
+                </span>
+                <h3 className="text-base font-bold text-white mt-1">{viewingItem.name}</h3>
+                <p className="text-xs text-slate-400">{getCategoryConfig(viewingItem.category, viewingItem.subcategory).label}</p>
+              </div>
+            </div>
+
+            <div className="space-y-2 text-xs">
+              {/* Universal Fields */}
+              <div className="flex justify-between py-1 border-b border-slate-800/60">
+                <span className="text-slate-400">Patrimônio e S/N:</span>
+                <span className="text-slate-200 font-mono font-bold">
+                  {viewingItem.assetTag && viewingItem.assetTag !== 'N/A' ? viewingItem.assetTag : 'Não especificado'} 
+                  {' / '} 
+                  {viewingItem.serialNumber && viewingItem.serialNumber !== 'N/A' ? viewingItem.serialNumber : 'Não especificado'}
+                </span>
+              </div>
+              
+              <div className="flex justify-between py-1 border-b border-slate-800/60">
+                <span className="text-slate-400">Localização / Sala / Setor:</span>
+                <span className="text-slate-200 font-bold text-right">
+                  {viewingItem.locationName ? viewingItem.locationName + (viewingItem.locationDetails ? ` (${viewingItem.locationDetails})` : '') : 'Não especificado'}
+                </span>
+              </div>
+
+              <div className="flex justify-between py-1 border-b border-slate-800/60">
+                <span className="text-slate-400">Responsável / Alocado para:</span>
+                <span className="text-slate-200 font-bold text-right">{viewingItem.assignedTo && viewingItem.assignedTo !== 'Não atribuído' ? viewingItem.assignedTo : 'Não especificado'}</span>
+              </div>
+
+              <div className="flex items-center justify-between py-1 border-b border-slate-800/60">
+                <span className="text-slate-400">Status:</span>
+                <span>{getStatusBadge(viewingItem.status)}</span>
+              </div>
+
+              {/* Conditional Fields */}
+              {viewingItem.category === 'COMPUTADOR' && (
+                <>
+                  <div className="flex justify-between py-1 border-b border-slate-800/60">
+                    <span className="text-slate-400">Processador/CPU:</span>
+                    <span className="text-slate-200 font-bold text-right">{(viewingItem as any).cpu || (viewingItem.specifications?.includes('CPU') ? viewingItem.specifications : 'Não especificado')}</span>
+                  </div>
+                  <div className="flex justify-between py-1 border-b border-slate-800/60">
+                    <span className="text-slate-400">Memória RAM:</span>
+                    <span className="text-slate-200 font-bold text-right">{(viewingItem as any).ram || 'Não especificado'}</span>
+                  </div>
+                  <div className="flex justify-between py-1 border-b border-slate-800/60">
+                    <span className="text-slate-400">Armazenamento (SSD/HD):</span>
+                    <span className="text-slate-200 font-bold text-right">{(viewingItem as any).storage || 'Não especificado'}</span>
+                  </div>
+                  <div className="flex justify-between py-1 border-b border-slate-800/60">
+                    <span className="text-slate-400">Sistema Operacional:</span>
+                    <span className="text-slate-200 font-bold text-right">{(viewingItem as any).os || 'Não especificado'}</span>
+                  </div>
+                  <div className="flex justify-between py-1 border-b border-slate-800/60">
+                    <span className="text-slate-400">Hostname:</span>
+                    <span className="text-slate-200 font-bold text-right">{(viewingItem as any).hostname || 'Não especificado'}</span>
+                  </div>
+                  <div className="flex justify-between py-1 border-b border-slate-800/60">
+                    <span className="text-slate-400">IP Atual:</span>
+                    <span className="text-[#00f2fe] font-mono font-bold text-right">{viewingItem.currentIp || 'Não especificado'}</span>
+                  </div>
+                  <div className="flex justify-between py-1 border-b border-slate-800/60">
+                    <span className="text-slate-400">MAC Address:</span>
+                    <span className="text-slate-200 font-mono font-bold text-right">{viewingItem.macAddress || 'Não especificado'}</span>
+                  </div>
+                </>
+              )}
+
+              {(viewingItem.category === 'IMPRESSORA' || viewingItem.category === 'SCANNER') && (
+                <>
+                  <div className="flex justify-between py-1 border-b border-slate-800/60">
+                    <span className="text-slate-400">IP Atual:</span>
+                    <span className="text-[#00f2fe] font-mono font-bold text-right">{viewingItem.currentIp || 'Não especificado'}</span>
+                  </div>
+                  <div className="flex justify-between py-1 border-b border-slate-800/60">
+                    <span className="text-slate-400">MAC Address:</span>
+                    <span className="text-slate-200 font-mono font-bold text-right">{viewingItem.macAddress || 'Não especificado'}</span>
+                  </div>
+                  <div className="flex justify-between py-1 border-b border-slate-800/60">
+                    <span className="text-slate-400">Tipo (Tinta/Laser/Térmica):</span>
+                    <span className="text-slate-200 font-bold text-right">{(viewingItem as any).printerType || (viewingItem.specifications?.includes('Laser') ? 'Laser' : 'Não especificado')}</span>
+                  </div>
+                  <div className="flex justify-between py-1 border-b border-slate-800/60">
+                    <span className="text-slate-400">Ciclo/Contador:</span>
+                    <span className="text-slate-200 font-bold text-right">{(viewingItem as any).cycleCount || 'Não especificado'}</span>
+                  </div>
+                </>
+              )}
+
+              {viewingItem.category === 'MONITOR' && (
+                <>
+                  <div className="flex justify-between py-1 border-b border-slate-800/60">
+                    <span className="text-slate-400">Tamanho (Polegadas):</span>
+                    <span className="text-slate-200 font-bold text-right">{(viewingItem as any).sizeInches || 'Não especificado'}</span>
+                  </div>
+                  <div className="flex justify-between py-1 border-b border-slate-800/60">
+                    <span className="text-slate-400">Resolução:</span>
+                    <span className="text-slate-200 font-bold text-right">{(viewingItem as any).resolution || 'Não especificado'}</span>
+                  </div>
+                  <div className="flex justify-between py-1 border-b border-slate-800/60">
+                    <span className="text-slate-400">Tipo de Painel:</span>
+                    <span className="text-slate-200 font-bold text-right">{(viewingItem as any).panelType || 'Não especificado'}</span>
+                  </div>
+                </>
+              )}
+
+              {viewingItem.category === 'SOFTWARE' && (
+                <>
+                  <div className="flex justify-between py-1 border-b border-slate-800/60">
+                    <span className="text-slate-400">Fabricante:</span>
+                    <span className="text-slate-200 font-bold text-right">{viewingItem.brand || 'Não especificado'}</span>
+                  </div>
+                  <div className="flex justify-between py-1 border-b border-slate-800/60">
+                    <span className="text-slate-400">Versão:</span>
+                    <span className="text-slate-200 font-bold text-right">{(viewingItem as any).version || (viewingItem.model) || 'Não especificado'}</span>
+                  </div>
+                  <div className="flex justify-between py-1 border-b border-slate-800/60">
+                    <span className="text-slate-400">Chave de Licença:</span>
+                    <span className="text-slate-200 font-mono font-bold text-right">{(viewingItem as any).licenseKey || 'Não especificado'}</span>
+                  </div>
+                  <div className="flex justify-between py-1 border-b border-slate-800/60">
+                    <span className="text-slate-400">Data de Expiração:</span>
+                    <span className="text-slate-200 font-bold text-right">{(viewingItem as any).expirationDate || 'Não especificado'}</span>
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* Footer Buttons */}
+            <div className="mt-6 pt-4 border-t border-slate-800 flex items-center justify-between">
+              {isAdmin ? (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleDelete(viewingItem.id, viewingItem.name);
+                    setViewingItem(null);
+                  }}
+                  className="px-4 py-2 border border-rose-500/50 text-rose-400 hover:bg-rose-500/10 rounded-xl text-xs font-bold transition-all"
+                >
+                  Excluir Ativo
+                </button>
+              ) : <div></div>}
+              <div className="flex gap-2">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setViewingItem(null);
+                  }}
+                  className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-bold transition-all"
+                >
+                  Fechar
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setViewingItem(null);
+                    handleOpenEditModal(viewingItem);
+                  }}
+                  className="px-4 py-2 bg-[#00f2fe] hover:bg-cyan-400 text-slate-950 rounded-xl text-xs font-extrabold transition-all shadow-[0_0_15px_rgba(0,242,254,0.3)]"
+                >
+                  Editar Ativo
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
