@@ -17,6 +17,7 @@ import {
 import { api } from '../../services/api';
 import { TicketPriority } from '../../types';
 import { useAuth } from '../../contexts/AuthContext';
+import { useEscapeKey } from '../../hooks/useEscapeKey';
 
 interface CreateTicketModalProps {
   isOpen: boolean;
@@ -130,16 +131,7 @@ export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
     fetchCategories();
   }, [isOpen, user]);
 
-  useEffect(() => {
-    if (!isOpen) return;
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        onClose();
-      }
-    };
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, onClose]);
+  useEscapeKey(onClose, isOpen);
 
   if (!isOpen) return null;
 

@@ -5,6 +5,7 @@ import { Role } from '@prisma/client';
 import { requireRole } from '../middlewares/auth.middleware';
 
 export const sectorRouter = Router();
+const sectorStore = prisma.sector as any;
 
 const CreateSectorSchema = z.object({
   name: z.string().min(1, 'Nome do setor é obrigatório'),
@@ -15,9 +16,10 @@ const UpdateSectorSchema = z.object({
 });
 
 // GET /api/sectors - Lista todos os setores
-sectorRouter.get('/', async (_req: Request, res: Response) => {
+sectorRouter.get('/', async (req: Request, res: Response) => {
   try {
-    const sectors = await prisma.sector.findMany({
+    const sectors = await sectorStore.findMany({
+      where: { companyId: req.user!.companyId },
       orderBy: { name: 'asc' },
     });
     return res.json({ success: true, data: sectors });
@@ -29,8 +31,8 @@ sectorRouter.get('/', async (_req: Request, res: Response) => {
 // GET /api/sectors/:id - Busca setor por ID
 sectorRouter.get('/:id', async (req: Request, res: Response) => {
   try {
-    const sector = await prisma.sector.findUnique({
-      where: { id: req.params.id },
+    const sector = await sectorStore.findFirst({
+      where: { id: req.params.id, companyId: req.user!.companyId },
     });
     if (!sector) {
       return res.status(404).json({ success: false, message: 'Setor não encontrado' });
@@ -45,8 +47,16 @@ sectorRouter.get('/:id', async (req: Request, res: Response) => {
 sectorRouter.post('/', requireRole([Role.SUPERADMIN, Role.ADMIN]), async (req: Request, res: Response) => {
   try {
     const { name } = CreateSectorSchema.parse(req.body);
-    const sector = await prisma.sector.create({
-      data: { name },
+    const normalizedName = name.trim();
+    const duplicate = await sectorStore.findFirst({
+      where: { companyId: req.user!.companyId, name: { equals: normalizedName, mode: 'insensitive' } },
+      select: { id: true },
+    });
+    if (duplicate) {
+      return res.status(409).json({ success: false, message: 'Já existe um setor com esse nome.' });
+    }
+    const sector = await sectorStore.create({
+      data: { name: normalizedName, companyId: req.user!.companyId },
     });
     return res.status(201).json({ success: true, data: sector });
   } catch (error: any) {
@@ -61,9 +71,27 @@ sectorRouter.post('/', requireRole([Role.SUPERADMIN, Role.ADMIN]), async (req: R
 sectorRouter.put('/:id', requireRole([Role.SUPERADMIN, Role.ADMIN]), async (req: Request, res: Response) => {
   try {
     const { name } = UpdateSectorSchema.parse(req.body);
-    const sector = await prisma.sector.update({
-      where: { id: req.params.id },
-      data: { name },
+    const normalizedName = name.trim();
+    const duplicate = await sectorStore.findFirst({
+      where: {
+        companyId: req.user!.companyId,
+        name: { equals: normalizedName, mode: 'insensitive' },
+        NOT: { id: req.params.id },
+      },
+      select: { id: true },
+    });
+    if (duplicate) {
+      return res.status(409).json({ success: false, message: 'Já existe um setor com esse nome.' });
+    }
+    const updated = await sectorStore.updateMany({
+      where: { id: req.params.id, companyId: req.user!.companyId },
+      data: { name: normalizedName },
+    });
+    if (updated.count === 0) {
+      return res.status(404).json({ success: false, message: 'Setor não encontrado' });
+    }
+    const sector = await sectorStore.findFirst({
+      where: { id: req.params.id, companyId: req.user!.companyId },
     });
     return res.json({ success: true, data: sector });
   } catch (error: any) {
@@ -77,15 +105,22 @@ sectorRouter.put('/:id', requireRole([Role.SUPERADMIN, Role.ADMIN]), async (req:
 // DELETE /api/sectors/:id - Remove setor
 sectorRouter.delete('/:id', requireRole([Role.SUPERADMIN, Role.ADMIN]), async (req: Request, res: Response) => {
   try {
-    const ticketCount = await (prisma.ticket as any).count({ where: { sectorId: req.params.id } });
+    const sector = await sectorStore.findFirst({
+      where: { id: req.params.id, companyId: req.user!.companyId },
+      select: { id: true },
+    });
+    if (!sector) {
+      return res.status(404).json({ success: false, message: 'Setor não encontrado' });
+    }
+    const ticketCount = await (prisma.ticket as any).count({ where: { sectorId: req.params.id, companyId: req.user!.companyId } });
     if (ticketCount > 0) {
       return res.status(409).json({
         success: false,
         message: `Este setor está associado a ${ticketCount} chamado(s) e não pode ser excluído.`,
       });
     }
-    await prisma.sector.delete({
-      where: { id: req.params.id },
+    await sectorStore.delete({
+      where: { id: sector.id },
     });
     return res.json({ success: true, message: 'Setor removido com sucesso' });
   } catch (error: any) {

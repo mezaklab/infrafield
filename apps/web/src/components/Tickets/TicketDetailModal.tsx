@@ -17,6 +17,7 @@ import {
 import { api } from '../../services/api';
 import { Ticket, TicketStatus, TicketPriority, SystemUser } from '../../types';
 import { useAuth } from '../../contexts/AuthContext';
+import { useEscapeKey } from '../../hooks/useEscapeKey';
 
 interface TicketDetailModalProps {
   ticketId: string | null;
@@ -100,16 +101,7 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [ticket?.messages]);
 
-  useEffect(() => {
-    if (!isOpen) return;
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        onClose();
-      }
-    };
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, onClose]);
+  useEscapeKey(onClose, isOpen);
 
   if (!isOpen || !ticketId) return null;
 

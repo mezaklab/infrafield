@@ -3,11 +3,13 @@ import { prisma } from '../lib/prisma';
 import { sendTelegramNotification } from '../services/telegram.service';
 
 export const notificationRouter = Router();
+const notificationStore = prisma.notification as any;
 
 // GET /api/notifications - List notifications
-notificationRouter.get('/', async (_req: Request, res: Response) => {
+notificationRouter.get('/', async (req: Request, res: Response) => {
   try {
-    const notifications = await prisma.notification.findMany({
+    const notifications = await notificationStore.findMany({
+      where: { companyId: req.user!.companyId },
       orderBy: { createdAt: 'desc' },
       take: 30,
     });
@@ -20,14 +22,15 @@ notificationRouter.get('/', async (_req: Request, res: Response) => {
 });
 
 // PATCH /api/notifications/mark-as-read - Mark all unread notifications as read
-notificationRouter.patch('/mark-as-read', async (_req: Request, res: Response) => {
+notificationRouter.patch('/mark-as-read', async (req: Request, res: Response) => {
   try {
-    await prisma.notification.updateMany({
-      where: { isRead: false },
+    await notificationStore.updateMany({
+      where: { companyId: req.user!.companyId, isRead: false },
       data: { isRead: true },
     });
 
-    const updatedNotifications = await prisma.notification.findMany({
+    const updatedNotifications = await notificationStore.findMany({
+      where: { companyId: req.user!.companyId },
       orderBy: { createdAt: 'desc' },
       take: 30,
     });
@@ -43,9 +46,16 @@ notificationRouter.patch('/mark-as-read', async (_req: Request, res: Response) =
 notificationRouter.patch('/:id/read', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const notification = await prisma.notification.update({
-      where: { id },
+    const updated = await notificationStore.updateMany({
+      where: { id, companyId: req.user!.companyId },
       data: { isRead: true },
+    });
+    if (updated.count === 0) {
+      return res.status(404).json({ error: 'Notificação não encontrada' });
+    }
+
+    const notification = await notificationStore.findFirst({
+      where: { id, companyId: req.user!.companyId },
     });
 
     return res.json(notification);

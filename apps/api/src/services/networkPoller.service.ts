@@ -73,7 +73,7 @@ export async function pollNetworkAssets(): Promise<void> {
           console.log(`[NetworkPoller] 🔄 Status do ativo "${asset.name}" atualizado de ${asset.status} -> ${newStatus}`);
 
           try {
-            await prisma.notification.create({
+            await (prisma.notification as any).create({
               data: {
                 title: newStatus === AssetStatus.CRITICAL 
                   ? `🚨 Alerta de Falha ICMP: ${asset.code}` 
@@ -84,6 +84,7 @@ export async function pollNetworkAssets(): Promise<void> {
                 type: newStatus === AssetStatus.CRITICAL ? 'ALERT' : 'SUCCESS',
                 isRead: false,
                 assetId: asset.id,
+                companyId: asset.companyId,
               },
             });
           } catch (notifErr) {
@@ -131,7 +132,7 @@ export async function pollNetworkAssets(): Promise<void> {
           console.log(`[NetworkPoller] 🔄 Status do periférico "${peripheral.name}" atualizado de ${peripheral.status} -> ${newStatus}`);
 
           try {
-            await prisma.notification.create({
+            await (prisma.notification as any).create({
               data: {
                 title: newStatus === AssetStatus.CRITICAL 
                   ? `🚨 Alerta ICMP Periférico: ${peripheral.code}` 
@@ -141,6 +142,7 @@ export async function pollNetworkAssets(): Promise<void> {
                   : `O periférico/equipamento ${peripheral.name} (${target}) voltou a responder normalmente ao ping.`,
                 type: newStatus === AssetStatus.CRITICAL ? 'ALERT' : 'SUCCESS',
                 isRead: false,
+                companyId: peripheral.companyId,
               },
             });
           } catch (notifErr) {

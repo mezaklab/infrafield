@@ -29,6 +29,7 @@ import { getAssets, createAsset, updateAsset, deleteAsset, getLocations, downloa
 import { getSocket, StatusUpdatedPayload } from '../services/socket';
 import { getLocationFullName } from '../utils/location';
 import { ModalImportacaoCSV } from '../components/Assets/ModalImportacaoCSV';
+import { useEscapeKey } from '../hooks/useEscapeKey';
 import { ExportDropdown } from '../components/Layout/ExportDropdown';
 import { getGenericAssetKind } from '../utils/assetPresentation';
 
@@ -130,16 +131,12 @@ export const Assets: React.FC<AssetsProps> = ({ lensImport, onLensImportConsumed
     wifiBands: '',
   });
 
-  useEffect(() => {
-    const handleEsc = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        setSelectedAsset(null);
-        setIsModalOpen(false);
-      }
-    };
-    window.addEventListener('keydown', handleEsc);
-    return () => window.removeEventListener('keydown', handleEsc);
-  }, []);
+  const handleCloseModals = () => {
+    setSelectedAsset(null);
+    setIsModalOpen(false);
+  };
+
+  useEscapeKey(handleCloseModals, isModalOpen || !!selectedAsset);
 
   useEffect(() => {
     if (!lensImport) return;
@@ -767,7 +764,7 @@ export const Assets: React.FC<AssetsProps> = ({ lensImport, onLensImportConsumed
 
       {/* Asset Details Modal */}
       {selectedAsset && (
-        <div className="responsive-modal-backdrop" onClick={() => setSelectedAsset(null)}>
+        <div className="responsive-modal-backdrop">
           <div className="responsive-modal-panel bg-[#080d1a] border-cyan-500/20 max-w-lg relative max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
             <button
               onClick={() => setSelectedAsset(null)}
@@ -872,7 +869,7 @@ export const Assets: React.FC<AssetsProps> = ({ lensImport, onLensImportConsumed
 
       {/* Asset Creation & Editing Modal */}
       {isModalOpen && (
-        <div className="responsive-modal-backdrop" onClick={() => setIsModalOpen(false)}>
+        <div className="responsive-modal-backdrop">
           <div className="responsive-modal-panel bg-[#080d1a] border-cyan-500/20 max-w-md relative max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
             <button
               onClick={() => setIsModalOpen(false)}

@@ -136,6 +136,9 @@ model Company {
   visits      Visit[]
   issues      Issue[]
   tickets     Ticket[]
+  notifications Notification[]
+  sectors     Sector[]
+  categories  Category[]
 
   @@map("companies")
 }
@@ -430,9 +433,12 @@ model Notification {
   type      String   @default("ALERT")
   isRead    Boolean  @default(false)
   assetId   String?
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  @@index([companyId])
   @@map("notifications")
 }
 
@@ -595,21 +601,27 @@ model Settings {
 model Sector {
   id        String   @id @default(uuid())
   name      String
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   tickets Ticket[]
 
+  @@index([companyId])
   @@map("sectors")
 }
 
 model Category {
   id        String   @id @default(uuid())
   name      String
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   tickets Ticket[]
 
+  @@index([companyId])
   @@map("categories")
 }

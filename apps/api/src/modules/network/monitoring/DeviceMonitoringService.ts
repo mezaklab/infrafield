@@ -122,12 +122,13 @@ export class DeviceMonitoringService {
         },
       });
       if (ipChanged && device.currentIp) {
-        await tx.notification.create({
+        await (tx.notification as any).create({
           data: {
             title: `IP alterado: ${device.name}`,
             message: `${device.name} alterou seu endereço IP de ${device.currentIp} para ${newIp}.`,
             type: 'INFO',
             assetId: device.id,
+            companyId: device.companyId,
           },
         });
       }
@@ -168,8 +169,14 @@ export class DeviceMonitoringService {
       companyId: updated.companyId,
     });
     if (status === DeviceMonitoringStatus.OFFLINE && previousStatus !== DeviceMonitoringStatus.OFFLINE) {
-      await prisma.notification.create({
-        data: { title: `Dispositivo offline: ${updated.name}`, message: `${updated.name} atingiu ${failures} falhas consecutivas.`, type: 'ALERT', assetId: updated.id },
+      await (prisma.notification as any).create({
+        data: {
+          title: `Dispositivo offline: ${updated.name}`,
+          message: `${updated.name} atingiu ${failures} falhas consecutivas.`,
+          type: 'ALERT',
+          assetId: updated.id,
+          companyId: updated.companyId,
+        },
       });
     }
   }

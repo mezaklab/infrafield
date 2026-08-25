@@ -15,7 +15,6 @@ import { notificationRouter } from './notification.routes';
 import { peripheralRouter } from './peripheral.routes';
 import { ticketRouter } from './ticket.routes';
 import { adminRouter } from './admin.routes';
-import { settingsRouter } from './settings.routes';
 import { sectorRouter } from './sector.routes';
 import { categoryRouter } from './category.routes';
 import { requireAuth, requirePermission, requireRole } from '../middlewares/auth.middleware';
@@ -55,12 +54,10 @@ routes.use('/api/checklists',   requireAuth, checklistRouter);
 routes.use('/api/issues',       requireAuth, issueRouter);
 routes.use('/api/reports',      requireAuth, reportRouter);
 routes.use('/api/notifications', requireAuth, notificationRouter);
-routes.use('/api/settings',     requireAuth, requireRole([Role.SUPERADMIN, Role.ADMIN]), settingsRouter);
 // Any authenticated user may list sectors to open a ticket. Mutation RBAC lives
 // inside sectorRouter so management remains restricted to administrators.
 routes.use('/api/sectors',      requireAuth, sectorRouter);
 routes.use('/api/categories',   requireAuth, categoryRouter);
-routes.use('/api/whatsapp',     requireAuth, requireRole([Role.SUPERADMIN, Role.ADMIN]));
 
 // ─── Admin Backoffice — SUPERADMIN & ADMIN only ───────────────────────────────
 routes.use('/api/admin', requireAuth, requireRole([Role.SUPERADMIN, Role.ADMIN]), adminRouter);

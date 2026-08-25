@@ -1,5 +1,6 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import { X, Server, LayoutDashboard, Network, Laptop, MapPin, AlertTriangle, Headset, BarChart3, Settings, ShieldCheck, LogOut } from 'lucide-react';
+import { useEscapeKey } from '../../hooks/useEscapeKey';
 import { TabType } from '../../types';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -7,12 +8,7 @@ interface Props { open: boolean; onClose: () => void; activeTab: TabType; onNavi
 
 export const MobileDrawer: React.FC<Props> = ({ open, onClose, activeTab, onNavigate, onAdmin, onLogout }) => {
   const { user, canAccessAdmin, isFinalUser } = useAuth();
-  useEffect(() => {
-    if (!open) return;
-    const close = (event: KeyboardEvent) => event.key === 'Escape' && onClose();
-    document.addEventListener('keydown', close);
-    return () => document.removeEventListener('keydown', close);
-  }, [open, onClose]);
+  useEscapeKey(onClose, open);
   if (!open) return null;
   const items = isFinalUser ? [{ id: 'tickets' as TabType, label: 'Meus Chamados', icon: Headset }] : [
     { id: 'dashboard' as TabType, label: 'Dashboard NOC', icon: LayoutDashboard },

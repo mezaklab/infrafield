@@ -1,5 +1,6 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { Camera, Upload, X, Check } from 'lucide-react';
+import React, { useState, useRef } from 'react';
+import { Camera, X, Upload, Check } from 'lucide-react';
+import { useEscapeKey } from '../../hooks/useEscapeKey';
 import { compressImage } from '../../utils/imageCompressor';
 
 interface PhotoCaptureModalProps {
@@ -19,16 +20,7 @@ export const PhotoCaptureModal: React.FC<PhotoCaptureModalProps> = ({
   const [compressing, setCompressing] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  useEffect(() => {
-    if (!isOpen) return;
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        onClose();
-      }
-    };
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, onClose]);
+  useEscapeKey(onClose, isOpen);
 
   if (!isOpen) return null;
 

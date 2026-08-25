@@ -29,9 +29,9 @@ export const Header: React.FC<HeaderProps> = ({ title, onRefresh, onOpenMenu }) 
         {/* Offline / Online Status Indicator */}
         <div className="flex items-center gap-2">
           {isOnline ? (
-            <span className="inline-flex items-center gap-2 text-xs text-slate-300" aria-label="InfraField operacional">
+            <span className="inline-flex items-center gap-2 text-xs text-slate-300" aria-label="InfraField Operacional">
               <span className="w-2 h-2 rounded-full bg-emerald-400" aria-hidden="true" />
-              <span className="hidden md:inline">InfraField operacional</span>
+              <span className="hidden md:inline">InfraField Operacional</span>
               {pendingCount > 0 && (
                 <button
                   onClick={() => syncNow()}

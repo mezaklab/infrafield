@@ -31,7 +31,7 @@ interface AuthContextValue {
   isFinalUser: boolean;    // USUARIO
   canAccessAdmin: boolean; // SUPERADMIN or ADMIN
   hasPermission: (permission: string) => boolean;
-  login: (username: string, password: string) => Promise<void>;
+  login: (username: string, password: string, rememberMe?: boolean) => Promise<void>;
   logout: () => void;
 }
 
@@ -44,25 +44,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Leitura síncrona imediata do localStorage na inicialização do estado
   const [token, setToken] = useState<string | null>(() => {
     try {
-      const storedToken = localStorage.getItem(TOKEN_KEY);
+      const storedToken = localStorage.getItem(TOKEN_KEY) || sessionStorage.getItem(TOKEN_KEY);
       if (storedToken) {
         api.defaults.headers.common['Authorization'] = `Bearer ${storedToken}`;
         return storedToken;
       }
     } catch (e) {
-      console.error('Erro ao ler token do localStorage:', e);
+      console.error('Erro ao ler token:', e);
     }
     return null;
   });
 
   const [user, setUser] = useState<AuthUser | null>(() => {
     try {
-      const storedUser = localStorage.getItem(USER_KEY);
+      const storedUser = localStorage.getItem(USER_KEY) || sessionStorage.getItem(USER_KEY);
       if (storedUser) {
         return JSON.parse(storedUser);
       }
     } catch (e) {
-      console.error('Erro ao ler usuário do localStorage:', e);
+      console.error('Erro ao ler usuário:', e);
     }
     return null;
   });
@@ -91,12 +91,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => window.removeEventListener('auth:unauthorized', handleUnauthorized);
   }, []);
 
-  const login = useCallback(async (username: string, password: string) => {
-    const response = await api.post<{ token: string; user: AuthUser }>('/auth/login', { identifier: username, password });
+  const login = useCallback(async (username: string, password: string, rememberMe: boolean = true) => {
+    const response = await api.post<{ token: string; user: AuthUser }>('/auth/login', { identifier: username, password, rememberMe });
     const { token: newToken, user: newUser } = response.data;
 
-    localStorage.setItem(TOKEN_KEY, newToken);
-    localStorage.setItem(USER_KEY, JSON.stringify(newUser));
+    const storage = rememberMe ? localStorage : sessionStorage;
+    
+    // Clear both storages first to prevent stale data
+    localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(USER_KEY);
+    sessionStorage.removeItem(TOKEN_KEY);
+    sessionStorage.removeItem(USER_KEY);
+
+    storage.setItem(TOKEN_KEY, newToken);
+    storage.setItem(USER_KEY, JSON.stringify(newUser));
     api.defaults.headers.common['Authorization'] = `Bearer ${newToken}`;
     setSocketAuthToken(newToken);
     setToken(newToken);
@@ -106,6 +114,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const logout = useCallback(() => {
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(USER_KEY);
+    sessionStorage.removeItem(TOKEN_KEY);
+    sessionStorage.removeItem(USER_KEY);
     delete api.defaults.headers.common['Authorization'];
     setSocketAuthToken(null);
     setToken(null);

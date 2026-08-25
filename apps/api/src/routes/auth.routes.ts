@@ -16,6 +16,7 @@ const resetTokenStore = prisma.passwordResetToken;
 const LoginSchema = z.object({
   identifier: z.string().trim().min(1, 'Identificador (usuário ou e-mail) é obrigatório').max(254),
   password: z.string().min(1, 'Senha é obrigatória').max(128),
+  rememberMe: z.boolean().optional(),
 });
 
 const ChangePasswordSchema = z.object({
@@ -38,7 +39,7 @@ authRouter.post('/login', loginRateLimiter, async (req: Request, res: Response) 
       return res.status(400).json({ error: 'Dados inválidos', details: parsed.error.format() });
     }
 
-    const { identifier, password } = parsed.data;
+    const { identifier, password, rememberMe } = parsed.data;
     const loginInput = identifier.trim().toLowerCase();
 
     const user = await prisma.user.findFirst({
@@ -76,9 +77,11 @@ authRouter.post('/login', loginRateLimiter, async (req: Request, res: Response) 
       accessRoleId: user.accessRoleId,
     };
 
+    const expiresIn = rememberMe ? '30d' : JWT_EXPIRES_IN;
+
     const token = jwt.sign(payload, JWT_SECRET, {
       algorithm: 'HS256',
-      expiresIn: JWT_EXPIRES_IN,
+      expiresIn,
       issuer: JWT_ISSUER,
       audience: JWT_AUDIENCE,
     } as jwt.SignOptions);

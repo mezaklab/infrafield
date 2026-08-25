@@ -154,7 +154,7 @@ export const OperationalDashboard: React.FC<Props> = ({ stats, devices, notifica
           </div>
         </div>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
-          <Metric label="Ativos" icon={Box} value={devices.length} detail={`${monitored.length} com monitoramento`} onClick={() => onNavigate('assets')} />
+          <Metric label="Ativos" icon={Box} value={devices.length} detail={`${monitored.length} com monitoramento`} onClick={() => onNavigate('peripherals')} />
           <Metric label="Online" icon={Wifi} value={online} detail={`${onlineRate.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}% do parque`} tone="good" onClick={() => onNavigate('assets')} />
           <Metric label="Offline" icon={WifiOff} value={offline.length} detail={offline.length ? 'sem resposta' : 'nenhum indisponível'} tone="critical" onClick={() => onNavigate('assets')} />
           <Metric label="Em atenção" icon={AlertTriangle} value={degraded.length + (stats?.issues.total || 0)} detail={`${degraded.length} degradados · ${stats?.issues.total || 0} ocorrências`} tone="warning" onClick={() => onNavigate('issues')} />

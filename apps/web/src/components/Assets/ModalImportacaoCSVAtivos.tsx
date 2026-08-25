@@ -4,13 +4,13 @@ import Papa from 'papaparse';
 import { api } from '../../services/api';
 import { useEscapeKey } from '../../hooks/useEscapeKey';
 
-interface ModalImportacaoCSVProps {
+interface ModalImportacaoCSVAtivosProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
 }
 
-export const ModalImportacaoCSV: React.FC<ModalImportacaoCSVProps> = ({
+export const ModalImportacaoCSVAtivos: React.FC<ModalImportacaoCSVAtivosProps> = ({
   isOpen,
   onClose,
   onSuccess,
@@ -26,7 +26,7 @@ export const ModalImportacaoCSV: React.FC<ModalImportacaoCSVProps> = ({
 
   if (!isOpen) return null;
 
-  const EXPECTED_HEADERS = ['Categoria', 'Patrimonio', 'MAC_Address', 'Fabricante', 'Modelo', 'Localidade', 'Status'];
+  const EXPECTED_HEADERS = ['Nome', 'Codigo', 'Categoria', 'Patrimonio', 'MAC_Address', 'Fabricante', 'Modelo', 'Localidade', 'Status'];
 
   const downloadTemplate = () => {
     const csvContent = EXPECTED_HEADERS.join(',') + '\n';
@@ -34,7 +34,7 @@ export const ModalImportacaoCSV: React.FC<ModalImportacaoCSVProps> = ({
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.setAttribute('download', 'template_importacao_ativos.csv');
+    link.setAttribute('download', 'template_importacao_ativos_ti.csv');
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -90,7 +90,7 @@ export const ModalImportacaoCSV: React.FC<ModalImportacaoCSVProps> = ({
       setSubmitting(true);
       setError(null);
       
-      await api.post('/assets/bulk', { assets: parsedData });
+      await api.post('/peripherals/bulk', { peripherals: parsedData });
       
       onSuccess();
       onClose();

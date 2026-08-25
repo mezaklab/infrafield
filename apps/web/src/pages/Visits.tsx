@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { MapPin, Calendar, Clock, User, Plus, Filter, CheckCircle2, AlertTriangle, Search, X, RefreshCw, ShieldCheck, FileText } from 'lucide-react';
 import { Visit, Location } from '../types';
 import { getVisits, createVisit, getLocations, downloadVisitPDFReport, downloadInventoryPDFReport, exportAssetsCSV } from '../services/api';
+import { useEscapeKey } from '../hooks/useEscapeKey';
 import { InspectionMode } from '../components/Visits/InspectionMode';
 import { ExportDropdown } from '../components/Layout/ExportDropdown';
 
@@ -79,6 +80,8 @@ export const Visits: React.FC = () => {
       setSubmitting(false);
     }
   };
+
+  useEscapeKey(() => setIsModalOpen(false), isModalOpen);
 
   if (activeInspectionId) {
     return (

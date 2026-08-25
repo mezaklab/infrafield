@@ -13,6 +13,8 @@ export const ticketRouter = Router();
 // The repository may have an older generated client until deployment runs
 // `prisma generate`; keep this delegate localized while schema migrations are pending.
 const ticketStore = prisma.ticket as any;
+const sectorStore = prisma.sector as any;
+const categoryStore = prisma.category as any;
 
 // Validation Schemas
 const CreateTicketSchema = z.object({
@@ -219,11 +221,14 @@ ticketRouter.get('/dashboard', async (req: Request, res: Response) => {
     // 4. Sector Distribution: only persisted Ticket.sectorId relations.
     const colors = ['#00f2fe', '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#64748b'];
     const sectorIds = sectorGroups.flatMap((group: { sectorId: string | null }) => group.sectorId ? [group.sectorId] : []);
-    const sectorNames = await prisma.sector.findMany({
-      where: { id: { in: sectorIds } },
+    const sectorNames = await sectorStore.findMany({
+      where: {
+        id: { in: sectorIds },
+        ...(userRole === Role.SUPERADMIN ? {} : { companyId: req.user!.companyId }),
+      },
       select: { id: true, name: true },
     });
-    const sectorNameById = new Map(sectorNames.map((sector) => [sector.id, sector.name]));
+    const sectorNameById = new Map<string, string>(sectorNames.map((sector: { id: string; name: string }) => [sector.id, sector.name]));
     const sectorDistribution = sectorGroups.flatMap((group: { sectorId: string | null; _count: { _all: number } }, idx: number) => {
       if (!group.sectorId) return [];
       const name = sectorNameById.get(group.sectorId);
@@ -248,8 +253,14 @@ ticketRouter.get('/dashboard', async (req: Request, res: Response) => {
     const categoryCounts: { [key: string]: number } = {};
     const categoryGroups = await ticketStore.groupBy({ by: ['categoryId'], where: { ...baseWhere, categoryId: { not: null } }, _count: { _all: true } });
     const categoryIds = categoryGroups.flatMap((group: { categoryId: string | null }) => group.categoryId ? [group.categoryId] : []);
-    const categories = await prisma.category.findMany({ where: { id: { in: categoryIds } }, select: { id: true, name: true } });
-    const categoryNameById = new Map(categories.map((item) => [item.id, item.name]));
+    const categories = await categoryStore.findMany({
+      where: {
+        id: { in: categoryIds },
+        ...(userRole === Role.SUPERADMIN ? {} : { companyId: req.user!.companyId }),
+      },
+      select: { id: true, name: true },
+    });
+    const categoryNameById = new Map<string, string>(categories.map((item: { id: string; name: string }) => [item.id, item.name]));
     categoryGroups.forEach((group: { categoryId: string | null; _count: { _all: number } }) => {
       if (!group.categoryId) return;
       const name = categoryNameById.get(group.categoryId);
@@ -405,11 +416,11 @@ ticketRouter.post('/', ticketCreationRateLimiter, async (req: Request, res: Resp
     const authorId = user_id || req.user!.userId;
 
     const companyId = req.user!.companyId;
-    const sector = await prisma.sector.findUnique({ where: { id: sectorId } });
+    const sector = await sectorStore.findFirst({ where: { id: sectorId, companyId } });
     if (!sector) {
       return res.status(400).json({ error: 'O setor selecionado não existe mais. Selecione outro setor.' });
     }
-    const category = await prisma.category.findUnique({ where: { id: categoryId }, select: { id: true, name: true } });
+    const category = await categoryStore.findFirst({ where: { id: categoryId, companyId }, select: { id: true, name: true } });
     if (!category) return res.status(400).json({ error: 'Categoria de atendimento inválida.' });
     if (bodyLocationId) {
       const location = await prisma.location.findFirst({ where: { id: bodyLocationId, companyId } });
@@ -523,7 +534,7 @@ ticketRouter.patch('/:id', requireRole([Role.SUPERADMIN, Role.ADMIN, Role.MANAGE
       if (!assignee) return res.status(400).json({ error: 'Técnico inválido para este chamado.' });
     }
     if (sectorId) {
-      const sector = await prisma.sector.findUnique({ where: { id: sectorId }, select: { id: true } });
+      const sector = await sectorStore.findFirst({ where: { id: sectorId, companyId: existingTicket.companyId }, select: { id: true } });
       if (!sector) return res.status(400).json({ error: 'O setor selecionado não existe mais.' });
     }
     if (locationId) {
@@ -531,7 +542,7 @@ ticketRouter.patch('/:id', requireRole([Role.SUPERADMIN, Role.ADMIN, Role.MANAGE
       if (!location) return res.status(400).json({ error: 'Localização inválida para este chamado.' });
     }
     if (categoryId) {
-      const category = await prisma.category.findUnique({ where: { id: categoryId }, select: { id: true, name: true } });
+      const category = await categoryStore.findFirst({ where: { id: categoryId, companyId: existingTicket.companyId }, select: { id: true, name: true } });
       if (!category) return res.status(400).json({ error: 'Categoria de atendimento inválida.' });
       updateData.category = category.name;
     }

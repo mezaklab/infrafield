@@ -32,3 +32,5 @@ Thumbs.db
 # Uploads directory (user generated content)
 /apps/api/uploads/*
 !/apps/api/uploads/.gitkeep
+*.dump
+apps/api/scratch_*.ts

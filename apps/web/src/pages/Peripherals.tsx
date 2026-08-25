@@ -26,6 +26,7 @@ import {
   Package,
   Zap,
   SlidersHorizontal,
+  Upload,
 } from 'lucide-react';
 import { LensImportDraft, Location, Peripheral, PeripheralCategory, PeripheralSubcategory } from '../types';
 import { useAuth } from '../contexts/AuthContext';
@@ -40,6 +41,8 @@ import {
 import { getSocket, StatusUpdatedPayload } from '../services/socket';
 import { getLocationFullName } from '../utils/location';
 import { ExportDropdown } from '../components/Layout/ExportDropdown';
+import { ModalImportacaoCSVAtivos } from '../components/Assets/ModalImportacaoCSVAtivos';
+import { useEscapeKey } from '../hooks/useEscapeKey';
 
 // ─── Sub-module definitions ───────────────────────────────────────────────────
 
@@ -201,6 +204,7 @@ export const Peripherals: React.FC<PeripheralsProps> = ({ defaultSubTab = 'TODOS
 
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
+  const [isImportModalOpen, setIsImportModalOpen] = useState<boolean>(false);
   const [editingItem, setEditingItem] = useState<Peripheral | null>(null);
   const [isSaving, setIsSaving] = useState<boolean>(false);
 
@@ -249,6 +253,8 @@ export const Peripherals: React.FC<PeripheralsProps> = ({ defaultSubTab = 'TODOS
     setIsModalOpen(true);
     onLensImportConsumed?.();
   }, [lensImport, locations, onLensImportConsumed]);
+
+  useEscapeKey(() => setIsModalOpen(false), isModalOpen);
 
   const setActiveSubTab = (sub: PeripheralsSubTab) => {
     setActiveSubTabState(sub);
@@ -584,6 +590,13 @@ export const Peripherals: React.FC<PeripheralsProps> = ({ defaultSubTab = 'TODOS
             ]}
           />
 
+          <button
+            onClick={() => setIsImportModalOpen(true)}
+            className="flex items-center justify-center h-10 gap-2 bg-slate-800 hover:bg-slate-700 text-white font-semibold text-xs px-4 rounded-xl border border-slate-700 transition-all shrink-0"
+          >
+            <Upload className="w-4 h-4" /> Importar CSV
+          </button>
+          
           <button
             onClick={handleOpenCreateModal}
             className="flex items-center justify-center h-10 gap-2 bg-[#00f2fe] hover:bg-cyan-400 text-slate-950 font-extrabold text-xs px-4 rounded-xl shadow-[0_0_15px_rgba(0,242,254,0.3)] transition-all shrink-0"
@@ -1211,6 +1224,15 @@ export const Peripherals: React.FC<PeripheralsProps> = ({ defaultSubTab = 'TODOS
           </div>
         </div>
       )}
+      
+      <ModalImportacaoCSVAtivos
+        isOpen={isImportModalOpen}
+        onClose={() => setIsImportModalOpen(false)}
+        onSuccess={() => {
+          loadData();
+          alert('Importação concluída com sucesso!');
+        }}
+      />
     </div>
   );
 };

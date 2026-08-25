@@ -7,6 +7,7 @@ export const Login: React.FC<{ onForgotPassword?: () => void }> = ({ onForgotPas
   const { login } = useAuth();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [rememberMe, setRememberMe] = useState(false);
   const [showPass, setShowPass] = useState(false);
   const [loading, setLoading]   = useState(false);
   const [error, setError]       = useState<string | null>(null);
@@ -16,7 +17,7 @@ export const Login: React.FC<{ onForgotPassword?: () => void }> = ({ onForgotPas
     setError(null);
     setLoading(true);
     try {
-      await login(username, password);
+      await login(username, password, rememberMe);
       // Navigation handled by App.tsx (isAuthenticated flips to true)
     } catch (err: any) {
       const msg =
@@ -99,6 +100,19 @@ export const Login: React.FC<{ onForgotPassword?: () => void }> = ({ onForgotPas
                 {showPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
             </div>
+          </div>
+
+          <div className="flex items-center gap-2 mt-2">
+            <input
+              type="checkbox"
+              id="remember-me"
+              checked={rememberMe}
+              onChange={(e) => setRememberMe(e.target.checked)}
+              className="w-4 h-4 rounded border-slate-800 bg-slate-950 checked:bg-cyan-500 checked:border-cyan-500 focus:ring-cyan-500 focus:ring-offset-slate-900 cursor-pointer accent-cyan-500"
+            />
+            <label htmlFor="remember-me" className="text-xs text-slate-400 cursor-pointer select-none font-medium hover:text-slate-300 transition-colors">
+              Manter conectado
+            </label>
           </div>
 
           <button

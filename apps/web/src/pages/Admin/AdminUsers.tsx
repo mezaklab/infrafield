@@ -17,6 +17,7 @@ import {
   User,
 } from 'lucide-react';
 import { api } from '../../services/api';
+import { useEscapeKey } from '../../hooks/useEscapeKey';
 import { SystemUser, Location, AccessRole } from '../../types';
 import { useAuth } from '../../contexts/AuthContext';
 import { getLocationFullName } from '../../utils/location';
@@ -105,6 +106,8 @@ export const AdminUsers: React.FC = () => {
     setIsModalOpen(false);
     setEditingUser(null);
   };
+
+  useEscapeKey(handleCloseModal, isModalOpen);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

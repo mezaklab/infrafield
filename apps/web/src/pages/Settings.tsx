@@ -31,22 +31,7 @@ interface Category {
   createdAt: string;
 }
 
-interface SettingsData {
-  id?: string;
-  whatsapp_group_id: string | null;
-  whatsapp_group_name: string | null;
-  whatsapp_status: string | null;
-}
-
 export const Settings: React.FC = () => {
-  // Settings & WhatsApp State
-  const [, setSettings] = useState<SettingsData>({
-    whatsapp_group_id: null,
-    whatsapp_group_name: null,
-    whatsapp_status: 'DISCONNECTED',
-  });
-  const [loadingStatus, setLoadingStatus] = useState<boolean>(false);
-
   // Sectors & Categories State
   const [sectors, setSectors] = useState<Sector[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -61,32 +46,6 @@ export const Settings: React.FC = () => {
 
   // Notifications
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
-
-  const fetchSettings = async () => {
-    try {
-      const res = await api.get('/settings');
-      if (res.data?.data) {
-        setSettings(res.data.data);
-      }
-    } catch (err) {
-      console.error('Erro ao buscar configurações:', err);
-    }
-  };
-
-  const fetchWhatsappStatus = async () => {
-    try {
-      setLoadingStatus(true);
-      const res = await api.get('/whatsapp/status');
-      if (res.data) {
-        const status = res.data.status || 'UNKNOWN';
-        setSettings((prev) => ({ ...prev, whatsapp_status: status }));
-      }
-    } catch (err) {
-      console.warn('Erro ao buscar status do WhatsApp:', err);
-    } finally {
-      setLoadingStatus(false);
-    }
-  };
 
 
   const fetchSectors = async () => {
@@ -118,8 +77,6 @@ export const Settings: React.FC = () => {
   };
 
   useEffect(() => {
-    fetchSettings();
-    fetchWhatsappStatus();
     fetchSectors();
     fetchCategories();
   }, []);
@@ -214,14 +171,12 @@ export const Settings: React.FC = () => {
             Painel de Configurações Operacionais
           </h1>
           <p className="if-text-secondary mt-1 text-xs md:text-sm">
-            Gerenciamento de integrações com WhatsApp, cadastro de setores e categorias de chamados
+            Gerenciamento de integrações com Telegram, cadastro de setores e categorias de chamados
           </p>
         </div>
 
         <button
           onClick={() => {
-            fetchSettings();
-            fetchWhatsappStatus();
             fetchSectors();
             fetchCategories();
           }}
@@ -248,29 +203,15 @@ export const Settings: React.FC = () => {
         </div>
       )}
 
-      {/* Seção 1: Conexão WhatsApp */}
+      {/* Seção 1: Integração Telegram */}
       <section className="settings-panel surface-elevated rounded-2xl p-4 sm:p-5 md:p-6 space-y-5">
-        <div className="flex items-center justify-between border-b if-divider pb-4 gap-3">
-          <div className="flex items-center gap-3">
-            <div className="icon-box h-11 w-11 rounded-xl bg-[var(--if-accent-soft)] text-[var(--if-accent)] border border-cyan-500/20">
-              <MessageSquare className="w-6 h-6" />
-            </div>
-            <div>
-              <h2 className="if-text text-base md:text-lg font-bold">Integrador de Alertas (Telegram)</h2>
-              <p className="if-text-secondary text-xs">Roteamento automático de alertas para grupos</p>
-            </div>
+        <div className="flex items-center gap-3 border-b if-divider pb-4">
+          <div className="icon-box h-11 w-11 rounded-xl bg-[var(--if-accent-soft)] text-[var(--if-accent)] border border-cyan-500/20">
+            <MessageSquare className="w-6 h-6" />
           </div>
-
-          <div className="flex items-center gap-2">
-            <button
-              onClick={fetchWhatsappStatus}
-              disabled={loadingStatus}
-              className="if-button-secondary icon-box h-10 w-10 rounded-xl"
-              title="Atualizar Status"
-              aria-label="Atualizar status do WhatsApp"
-            >
-              <RefreshCw className={`w-4 h-4 ${loadingStatus ? 'animate-spin' : ''}`} />
-            </button>
+          <div>
+            <h2 className="if-text text-base md:text-lg font-bold">Integrador de Alertas (Telegram)</h2>
+            <p className="if-text-secondary text-xs">Roteamento automático de alertas para grupos</p>
           </div>
         </div>
 

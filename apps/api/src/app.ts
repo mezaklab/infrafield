@@ -29,7 +29,7 @@ export const createApp = (): Express => {
       callback(new Error('Origem não permitida pelo CORS.'));
     },
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'x-api-key'],
   }));
 
   // Body parser (increase limit for Base64 image fallback)

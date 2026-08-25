@@ -12,6 +12,7 @@ import {
 import { Issue, IssueSeverity, IssueStatus } from '../types';
 import { getIssues, createIssue, updateIssue, downloadInventoryPDFReport, exportAssetsCSV } from '../services/api';
 import { ExportDropdown } from '../components/Layout/ExportDropdown';
+import { useEscapeKey } from '../hooks/useEscapeKey';
 
 export const Issues: React.FC = () => {
   const [issues, setIssues] = useState<Issue[]>([]);
@@ -68,6 +69,8 @@ export const Issues: React.FC = () => {
       setSubmitting(false);
     }
   };
+
+  useEscapeKey(() => setIsModalOpen(false), isModalOpen);
 
   const handleStatusTransition = async (issueId: string, currentStatus: IssueStatus) => {
     let nextStatus: IssueStatus;

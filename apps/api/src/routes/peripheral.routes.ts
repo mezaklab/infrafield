@@ -244,6 +244,67 @@ peripheralRouter.post('/', async (req: Request, res: Response) => {
   }
 });
 
+// POST /api/peripherals/bulk - Import peripherals from CSV
+peripheralRouter.post('/bulk', async (req: Request, res: Response) => {
+  try {
+    const { peripherals } = req.body;
+    if (!Array.isArray(peripherals) || peripherals.length === 0) {
+      return res.status(400).json({ error: 'Nenhum ativo válido fornecido.' });
+    }
+
+    const companyId = req.user?.companyId;
+    if (!companyId) {
+      return res.status(400).json({ error: 'Empresa do usuário não identificada.' });
+    }
+
+    let createdCount = 0;
+
+    for (const item of peripherals) {
+      const { Categoria, Patrimonio, MAC_Address, Fabricante, Modelo, Status, Nome, Codigo } = item;
+      
+      const code = Codigo || Patrimonio || `PER-${Date.now().toString().slice(-6)}-${Math.random().toString(36).substring(2, 5).toUpperCase()}`;
+      const name = Nome || (Modelo ? `${Fabricante || 'Desconhecido'} ${Modelo}` : `Ativo ${code}`);
+      
+      // Default to COMPUTADOR if no category is provided
+      let category: PeripheralCategory = PeripheralCategory.OUTRO;
+      if (Categoria) {
+        const cat = Categoria.toUpperCase();
+        if (Object.values(PeripheralCategory).includes(cat as PeripheralCategory)) {
+          category = cat as PeripheralCategory;
+        }
+      }
+      
+      let mappedStatus: 'OPERATIONAL' | 'MAINTENANCE' | 'CRITICAL' | 'INACTIVE' = 'OPERATIONAL';
+      if (Status) {
+        const s = Status.toUpperCase();
+        if (s.includes('MANUTENÇÃO') || s.includes('MAINTENANCE')) mappedStatus = 'MAINTENANCE';
+        else if (s.includes('CRÍTICO') || s.includes('CRITICAL')) mappedStatus = 'CRITICAL';
+        else if (s.includes('INATIVO') || s.includes('INACTIVE')) mappedStatus = 'INACTIVE';
+      }
+
+      await prisma.peripheral.create({
+        data: {
+          name,
+          code,
+          category,
+          assetTag: Patrimonio || undefined,
+          macAddress: MAC_Address || undefined,
+          brand: Fabricante || undefined,
+          model: Modelo || undefined,
+          status: mappedStatus,
+          companyId,
+        }
+      });
+      createdCount++;
+    }
+
+    return res.status(201).json({ success: true, count: createdCount });
+  } catch (error) {
+    console.error('[PERIPHERALS] POST /bulk error:', error);
+    return res.status(500).json({ error: 'Erro ao importar ativos em lote.' });
+  }
+});
+
 // PATCH /api/peripherals/:id - Update peripheral item
 peripheralRouter.patch('/:id', async (req: Request, res: Response) => {
   try {

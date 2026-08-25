@@ -392,9 +392,14 @@ assetRouter.post('/bulk', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Empresa do usuário não identificada.' });
     }
 
-    let createdCount = 0;
+    const preparedAssets: Array<{ line: number; data: Prisma.AssetUncheckedCreateInput }> = [];
+    const importErrors: Array<{ line: number; errors: string[] }> = [];
+    const seenCodes = new Set<string>();
+    const seenMacs = new Set<string>();
 
-    for (const item of assets) {
+    assets.forEach((item, index) => {
+      const line = index + 2;
+      const rowErrors: string[] = [];
       const { Categoria, Patrimonio, MAC_Address, Fabricante, Modelo, Status } = item;
       
       const code = Patrimonio || `AST-${Date.now().toString().slice(-6)}-${Math.random().toString(36).substring(2, 5).toUpperCase()}`;
@@ -411,25 +416,77 @@ assetRouter.post('/bulk', async (req: Request, res: Response) => {
         else if (s.includes('INATIVO') || s.includes('INACTIVE')) mappedStatus = AssetStatus.INACTIVE;
       }
 
-      await prisma.asset.create({
+      const macAddress = MAC_Address ? normalizeMacAddress(String(MAC_Address)) : undefined;
+      if (MAC_Address && !macAddress) rowErrors.push('MAC Address inválido');
+      if (seenCodes.has(code)) rowErrors.push(`Patrimônio/código duplicado no CSV: ${code}`);
+      if (macAddress && seenMacs.has(macAddress)) rowErrors.push(`MAC Address duplicado no CSV: ${macAddress}`);
+
+      seenCodes.add(code);
+      if (macAddress) seenMacs.add(macAddress);
+
+      if (rowErrors.length > 0) {
+        importErrors.push({ line, errors: rowErrors });
+        return;
+      }
+
+      preparedAssets.push({
+        line,
         data: {
           name,
           code,
           category,
           assetTag: Patrimonio || undefined,
-          macAddress: MAC_Address || undefined,
+          macAddress,
           status: mappedStatus,
           companyId,
-          // We could resolve the location ID by name, but for simplicity we omit it if it requires a lookup
-          // If a sophisticated lookup is required, it should be done here.
-        }
+        },
       });
-      createdCount++;
+    });
+
+    if (preparedAssets.length === 0 && importErrors.length === 0) {
+      return res.status(400).json({ error: 'Nenhum ativo válido fornecido.' });
     }
 
-    return res.status(201).json({ success: true, count: createdCount });
-  } catch (error) {
+    const codes = preparedAssets.map((asset) => asset.data.code);
+    const macs = preparedAssets.flatMap((asset) => asset.data.macAddress ? [asset.data.macAddress] : []);
+    const existingAssets = await prisma.asset.findMany({
+      where: {
+        OR: [
+          codes.length ? { code: { in: codes } } : undefined,
+          macs.length ? { macAddress: { in: macs } } : undefined,
+        ].filter(Boolean) as Prisma.AssetWhereInput[],
+      },
+      select: { code: true, macAddress: true },
+    });
+    const existingCodes = new Set(existingAssets.map((asset) => asset.code));
+    const existingMacs = new Set(existingAssets.flatMap((asset) => asset.macAddress ? [asset.macAddress] : []));
+    preparedAssets.forEach((asset) => {
+      const rowErrors: string[] = [];
+      if (existingCodes.has(asset.data.code)) rowErrors.push(`Patrimônio/código já cadastrado: ${asset.data.code}`);
+      if (asset.data.macAddress && existingMacs.has(asset.data.macAddress)) rowErrors.push(`MAC Address já cadastrado: ${asset.data.macAddress}`);
+      if (rowErrors.length > 0) importErrors.push({ line: asset.line, errors: rowErrors });
+    });
+
+    if (importErrors.length > 0) {
+      return res.status(400).json({
+        error: 'Importação cancelada. Corrija as linhas indicadas e envie novamente.',
+        details: importErrors.sort((a, b) => a.line - b.line),
+      });
+    }
+
+    await prisma.$transaction(
+      preparedAssets.map((asset) => prisma.asset.create({ data: asset.data })),
+    );
+
+    return res.status(201).json({ success: true, count: preparedAssets.length });
+  } catch (error: any) {
     console.error('[ASSETS] POST /bulk error:', error);
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+      return res.status(409).json({
+        error: 'Importação cancelada. Um ou mais registros conflitam com dados já cadastrados.',
+        details: [{ line: null, errors: ['Conflito de chave única durante a transação. Nenhum ativo foi importado.'] }],
+      });
+    }
     return res.status(500).json({ error: 'Erro ao importar ativos em lote.' });
   }
 });
